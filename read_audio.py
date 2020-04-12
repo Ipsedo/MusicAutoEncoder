@@ -1,8 +1,9 @@
 import argparse
-from os import walk
-from os.path import splitext, isfile, isdir, basename, join
+from os import walk, mkdir, listdir
+from os.path import splitext, isfile, isdir, basename, join, exists
 import subprocess
 
+import torch as th
 import numpy as np
 import scipy
 from scipy.signal import spectrogram
@@ -14,6 +15,19 @@ from typing import Tuple
 
 from tqdm import tqdm
 
+import values
+
+
+###############
+# WAV stuff
+###############
+
+def compute_wav_size(wav_path: str, split_length) -> Tuple[int, int]:
+    sampling_rate, data = wavfile.read(wav_path)
+    split_size = sampling_rate * split_length // 1000
+    nb_split = floor(data.shape[0] / split_size)
+    return nb_split, split_size
+
 
 def open_wav(wav_path: str, split_length: int) -> Tuple[int, np.ndarray]:
     assert split_length > 1, f"Split length must be > 1 (actual == {split_length})."
@@ -23,7 +37,7 @@ def open_wav(wav_path: str, split_length: int) -> Tuple[int, np.ndarray]:
     split_size = sampling_rate * split_length // 1000
     nb_split = floor(data.shape[0] / split_size)
 
-    splitted_audio = np.asarray(np.split(data[:(split_size - 1) * nb_split], nb_split))
+    splitted_audio = np.asarray(np.split(data[:split_size * nb_split], nb_split))
 
     int_size = splitted_audio.itemsize * 8.
 
@@ -33,6 +47,10 @@ def open_wav(wav_path: str, split_length: int) -> Tuple[int, np.ndarray]:
 
     return sampling_rate, splitted_audio.mean(axis=2)
 
+
+###############
+# Spectro stuff
+###############
 
 def spectro_raw_audio(raw_audio_split: np.ndarray, nperseg: int, noverlap: int) -> np.ndarray:
     assert len(raw_audio_split.shape) == 2, \
@@ -51,6 +69,14 @@ def spectro_raw_audio(raw_audio_split: np.ndarray, nperseg: int, noverlap: int) 
                                padded_raw_audio_split)
 
 
+###############
+# FFT stuff
+###############
+
+def compute_fft_size(raw_audio_split_size: Tuple[int, int], nfft: int) -> Tuple[int, int, int]:
+    return raw_audio_split_size[0], nfft, raw_audio_split_size[1] // nfft
+
+
 def fft_raw_audio(raw_audio_split: np.ndarray, nfft: int) -> np.ndarray:
     assert len(raw_audio_split.shape) == 2, \
         f"Wrong audio shape len (actual == {len(raw_audio_split.shape)}, needed == 2)."
@@ -63,16 +89,14 @@ def fft_raw_audio(raw_audio_split: np.ndarray, nfft: int) -> np.ndarray:
     assert max_value <= 1.0 and min_value >= -1., \
         f"Raw audio values must be normlized between [-1., 0.] (actual == [{min_value}, {max_value}])."
 
-    pad = nfft - raw_audio_split.shape[-1] % nfft
-    padded_data = np.pad(raw_audio_split,
-                         ((0, 0), (0, pad)),
-                         mode="constant", constant_values=0)
-    splitted_data = np.stack(np.hsplit(padded_data, padded_data.shape[-1] / nfft), axis=-2)
+    splitted_data = np.stack(np.hsplit(raw_audio_split, raw_audio_split.shape[-1] / nfft), axis=-2)
     return np.apply_along_axis(lambda sub_split: scipy.fft(sub_split), 2, splitted_data)
 
 
 def convert_mp3_to_wav(root_dir: str, out_dir: str, limit: int) -> None:
     cpt = 0
+    if not exists(out_dir):
+        mkdir(out_dir)
     for dirname, dirnames, filenames in walk(root_dir):
         for filename in tqdm(filenames):
             if splitext(filename)[-1] == ".mp3":
@@ -96,6 +120,41 @@ def ifft_samples(fft_samples: np.ndarray, nfft: int) -> np.ndarray:
     return np.real(np.apply_along_axis(lambda fft_values: scipy.ifft(fft_values, n=nfft), 1, fft_samples))
 
 
+###############
+# Main
+###############
+
+def __read_wavs_without_copy(wav_root: str, nb_wav: int) -> th.Tensor:
+    wav_files = [join(wav_root, f) for f in listdir(wav_root) if splitext(f)[-1] == ".wav"]
+
+    if len(wav_files) > nb_wav:
+        wav_files = wav_files[:nb_wav]
+
+    n_channel = values.N_FFT * 2
+    fft_split_size = values.SAMPLE_RATE * values.N_SECOND_TRAIN // values.N_FFT
+    n_sample = 0
+
+    for w in tqdm(wav_files):
+        n_sample += compute_wav_size(w, values.N_SECOND_TRAIN * 1000)[0]
+
+    data = th.zeros(n_sample, n_channel, fft_split_size, dtype=th.float)
+
+    curr_split = 0
+
+    for w in tqdm(wav_files):
+        _, raw_audio = open_wav(w, values.N_SECOND_TRAIN * 1000)
+        fft_audio = fft_raw_audio(raw_audio, values.N_FFT).transpose((0, 2, 1))
+
+        data[curr_split:curr_split + fft_audio.shape[0], :values.N_FFT, :] = \
+            th.tensor(np.real(fft_audio), dtype=th.float)
+        data[curr_split:curr_split + fft_audio.shape[0], values.N_FFT:, :] = \
+            th.tensor(np.imag(fft_audio), dtype=th.float)
+
+        curr_split += fft_audio.shape[0]
+
+    return data
+
+
 def main() -> None:
     parser = argparse.ArgumentParser("Read audio main")
 
@@ -109,6 +168,11 @@ def main() -> None:
     process_parser.add_argument("--mp3-root", type=str, dest="audio_root", required=True)
     process_parser.add_argument("-o", "--out-dir", type=str, dest="out_dir", required=True)
     process_parser.add_argument("-l", "--limit", type=int, default=100)
+
+    save_parser = subparser.add_parser("save")
+    save_parser.add_argument("--wav-root", type=str, dest="wav_root", required=True)
+    save_parser.add_argument("-n", "--nb-wav", type=int, default=400, dest="nb_wav")
+    save_parser.add_argument("-o", "--out-tensor-file", type=str, dest="out_tensor_file", required=True)
 
     args = parser.parse_args()
 
@@ -164,6 +228,9 @@ def main() -> None:
 
     elif args.mode == "process":
         convert_mp3_to_wav(args.audio_root, args.out_dir, args.limit)
+    elif args.mode == "save":
+        data = __read_wavs_without_copy(args.wav_root, args.nb_wav)
+        th.save(data, args.out_tensor_file)
 
 
 if __name__ == "__main__":
