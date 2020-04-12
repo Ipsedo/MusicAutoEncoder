@@ -1,19 +1,5 @@
 import torch as th
-
-import numpy as np
-import values
-
-
-def multivariate_gen(n_sample: int, n_channel: int, mu: float = 0, sigma: float = 0.5) -> np.ndarray:
-    means = np.zeros((n_channel,)) + mu
-    cov_m = np.diag(np.ones((n_channel,)) * sigma)
-    return np.random.multivariate_normal(means, cov_m, n_sample)
-
-
-def multivariate_random_gen(n_sample: int, n_channel: int) -> np.ndarray:
-    means = np.random.rand(n_channel) * 2. - 1.
-    cov_m = np.diag(np.random.rand(n_channel))
-    return np.random.multivariate_normal(means, cov_m, (n_sample, values.HIDDEN_LENGTH)).transpose((0, 2, 1))
+from torch.distributions.multivariate_normal import MultivariateNormal
 
 
 def rec_normal_gen(hidden_size: int, nb_sec: int, nb_channel: int, eta: float = 0.8) -> th.Tensor:
@@ -26,51 +12,58 @@ def rec_normal_gen(hidden_size: int, nb_sec: int, nb_channel: int, eta: float = 
     return res.permute(1, 0).unsqueeze(0)
 
 
-def rec_multivariate_gen(n_sample: int, n_channel: int,
-                         eta: float = 0.9, alpha: float = 0.8, seed: int = 1234) -> np.ndarray:
-    np.random.seed(seed)
+def rec_multivariate_gen(hidden_size: int, nb_sec: int, nb_channel: int,
+                         means: th.Tensor, cov_matrix: th.Tensor,
+                         eta: float = 0.2) -> th.Tensor:
+    assert len(means.size()) == 1, \
+        f"Wrong mean size length, actual : {len(means.size())}, needed : {1}."
+    assert len(cov_matrix.size()) == 2, \
+        f"Wrong covariance matrix size length, actual {len(cov_matrix.size())}, needed : {2}"
+    assert cov_matrix.size(0) == cov_matrix.size(1) == means.size(0) == nb_channel, \
+        f"Wrong size equality in means or cov_mat or nb_channel, " \
+        f"means : {means.size()} cov_mat : {cov_matrix.size()} nb_channel : {nb_channel}"
 
-    res = np.zeros((n_sample * values.HIDDEN_LENGTH, n_channel)).astype(np.float16)
+    dist = MultivariateNormal(means, cov_matrix)
 
-    means = np.random.rand(n_channel) * 2. - 1.
-    cov_m = np.diag(np.random.rand(n_channel))
+    res = th.zeros(nb_sec * hidden_size, nb_channel)
 
-    random_mask = np.random.randint(0, 2, n_channel)
+    res[0] = dist.sample()
 
-    res[0] = np.random.multivariate_normal(means, cov_m, 1) * random_mask
+    for i in range(1, nb_sec * hidden_size):
+        res[i] = eta * res[i - 1] + (1. - eta) * dist.sample()
 
-    for i in range(1, n_sample * values.HIDDEN_LENGTH):
-        means = means * alpha + (np.random.rand(n_channel) * 2. - 1.) * (1. - alpha)
-        cov_m = cov_m * alpha + np.diag(np.random.rand(n_channel)) * (1. - alpha)
-        random_mask = np.random.randint(0, 2, n_channel)
-        res[i] = (res[i - 1] * eta + np.random.multivariate_normal(means, cov_m, 1) * (1. - eta)) * random_mask
-
-    return res.transpose((1, 0))
+    return res.to(th.float).transpose(1, 0).unsqueeze(0)
 
 
-def rec_multivariate_gen_2(n_sample: int, n_channel: int,
-                           n_change: int = 200, n_change_param: int = 200, seed: int = 1234) -> np.ndarray:
-    np.random.seed(seed)
+def gen_random_means(nb_channel: int, min_v: float, max_v: float) -> th.Tensor:
+    return th.randn(nb_channel) * (max_v - min_v) + min_v
 
-    res = np.zeros((n_sample * values.HIDDEN_LENGTH, n_channel)).astype(np.float16)
 
-    means = np.random.rand(n_channel) * 2. - 1.
-    cov_m = np.diag(np.random.rand(n_channel))
+def gen_random_cov_mat(nb_channel: int, extreme_value: float) -> th.Tensor:
+    cov_mat = th.randn(nb_channel, nb_channel) * extreme_value
+    cov_mat = th.mm(cov_mat.transpose(1, 0), cov_mat)
+    return cov_mat
 
-    res[0] = np.random.multivariate_normal(means, cov_m, 1)
 
-    for i in range(1, n_sample * values.HIDDEN_LENGTH):
-        alpha = np.ones((n_channel,))
-        random_idx = np.random.randint(0, n_channel, n_change_param)
-        alpha[random_idx] = 0
+def rec_multivariate_different_gen(hidden_size: int, nb_sec: int, nb_channel: int, eta: float = 0.1, beta: float = 0.2) -> th.Tensor:
+    means = gen_random_means(nb_channel, -0.3, 0.3)
+    cov_mat = gen_random_cov_mat(nb_channel, 20.)
+    dist = MultivariateNormal(means, cov_mat)
+    res = th.zeros(nb_sec * hidden_size, nb_channel)
 
-        means = means * alpha + (np.random.rand(n_channel) * 2. - 1.) * (1. - alpha)
-        cov_m = np.diag(np.diag(cov_m) * alpha + np.random.rand(n_channel) * (1. - alpha))
+    mask = th.randint(0, 2, (nb_channel,)).to(th.float)
 
-        eta = np.ones((n_channel,))
-        random_idx = np.random.randint(0, n_channel, n_change)
-        eta[random_idx] = 0
+    res[0] = dist.sample() * mask
 
-        res[i] = res[i - 1] * eta + np.random.multivariate_normal(means, cov_m, 1) * (1. - eta)
+    for i in range(1, nb_sec * hidden_size):
+        dist.loc = beta * dist.loc + (1. - beta) * gen_random_means(nb_channel, -0.3, 0.3)
+        dist.covariance_matrix = beta * dist.covariance_matrix + (1. - beta) * gen_random_cov_mat(nb_channel, 20.)
+        res[i] = eta * res[i - 1] + (1. - eta) * dist.sample()
 
-    return res.transpose((1, 0))
+        for _ in range(50):
+            j = th.randint(0, nb_channel, (1,)).item()
+            mask[j] = 1. - mask[j].item()
+
+        res[i] *= mask
+
+    return res.to(th.float).transpose(1, 0).unsqueeze(0)
