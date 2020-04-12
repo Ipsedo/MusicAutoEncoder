@@ -23,7 +23,7 @@ def open_wav(wav_path: str, split_length: int) -> Tuple[int, np.ndarray]:
     split_size = sampling_rate * split_length // 1000
     nb_split = floor(data.shape[0] / split_size)
 
-    splitted_audio = np.asarray(np.split(data[:split_size * nb_split], nb_split))
+    splitted_audio = np.asarray(np.split(data[:(split_size - 1) * nb_split], nb_split))
 
     int_size = splitted_audio.itemsize * 8.
 
@@ -85,12 +85,15 @@ def convert_mp3_to_wav(root_dir: str, out_dir: str, limit: int) -> None:
 
 def ifft_samples(fft_samples: np.ndarray, nfft: int) -> np.ndarray:
     assert len(fft_samples.shape) == 3, \
-        f"Wrong spectrogram shape len (actual == {len(fft_samples.shape)}, needed == {3}"
+        f"Wrong spectrogram shape len (actual : {len(fft_samples.shape)}, needed : {3})"
+    assert fft_samples.shape[1] == nfft, f"Only same nfft length for the moment"
     assert fft_samples.dtype == np.complex128, \
-        f"Wrong ndarray dtype (actual == {fft_samples.dtype}, needed == {np.complex128})"
+        f"Wrong ndarray dtype (actual : {fft_samples.dtype}, needed : {np.complex128})"
 
-    return np.real(np.apply_along_axis(lambda fft_values: scipy.ifft(fft_values, n=nfft), 2, fft_samples)) \
-        .reshape(fft_samples.shape[0], -1)
+    """return np.real(np.apply_along_axis(lambda fft_values: scipy.ifft(fft_values, n=nfft), 2, fft_samples)) \
+        .reshape(fft_samples.shape[0], -1)"""
+    fft_samples = fft_samples.transpose((0, 2, 1)).reshape(-1, nfft)
+    return np.real(np.apply_along_axis(lambda fft_values: scipy.ifft(fft_values, n=nfft), 1, fft_samples))
 
 
 def main() -> None:
@@ -155,7 +158,7 @@ def main() -> None:
 
         print(f"FFT shape {fft_audio.shape}, max {fft_audio.max()}, min {fft_audio.min()}")
 
-        new_raw_audio = ifft_samples(fft_audio, nperseg)
+        new_raw_audio = ifft_samples(fft_audio.transpose((0, 2, 1)), nperseg)
 
         wavfile.write("test.wav", sampling_rate, new_raw_audio.reshape(-1))
 
