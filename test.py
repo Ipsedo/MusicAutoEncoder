@@ -1,5 +1,4 @@
 import argparse
-from os.path import exists, isfile, splitext
 
 import torch as th
 import numpy as np
@@ -43,6 +42,10 @@ def main() -> None:
         out_enc = enc(data)
         print(out_enc.size())
         print(out_enc.max(), out_enc.min())
+        print("#################################################################")
+        print(out_enc.std(dim=1).min(), out_enc.std(dim=1).max())
+        print("#################################################################")
+        print(out_enc.mean(dim=1).min(), out_enc.mean(dim=1).max())
         out_dec = dec(out_enc)
 
         re_out = out_dec[:, :values.N_FFT, :].numpy()
