@@ -1,44 +1,29 @@
 import argparse
 import sys
-from os import listdir, mkdir
-from os.path import join, splitext, exists, isdir
-from typing import Tuple
-
-from multiprocessing import Pool
+from os import mkdir
+from os.path import join, exists, isdir
 
 from tqdm import tqdm
 
 import torch as th
 import torch.nn as nn
 
-import numpy as np
-
 from math import ceil
 import random
 
 import values
-import read_audio
-import hidden_repr
 from auto_encoder import Encoder, Decoder, Discriminator, DiscriminatorLoss
-
-
-def __read_one_wav(wav_file: str) -> Tuple[int, np.ndarray]:
-    return read_audio.open_wav(wav_file, values.N_SECOND_TRAIN * 1000)
-
-
-def __fft_one_sample(t: Tuple[int, np.ndarray]) -> np.ndarray:
-    return read_audio.fft_raw_audio(t[1], values.N_FFT)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser("Train audio auto-encoder")
 
-    parser.add_argument("-d", "--data-root", type=str, required=True, dest="data_root")
+    parser.add_argument("-d", "--data-file", type=str, required=True, dest="data_file")
     parser.add_argument("--out-model-dir", type=str, required=True, dest="out_dir")
 
     args = parser.parse_args()
 
-    data_root_path = args.data_root
+    data_file = args.data_file
     out_dir = args.out_dir
 
     if exists(out_dir) and not isdir(out_dir):
@@ -47,54 +32,36 @@ def main() -> None:
     if not exists(out_dir):
         mkdir(out_dir)
 
-    pool = Pool(16)
-
-    print("Reading wav....")
-    wav_files = [join(data_root_path, f) for f in listdir(data_root_path) if splitext(f)[-1] == ".wav"]
-    data = pool.map(__read_one_wav, wav_files)
-
-    print("Computing FFT...")
-    data = pool.map(__fft_one_sample, data)
-    data = np.concatenate(data, axis=0)
-    data = data.transpose((0, 2, 1))
-
-    data = np.concatenate([np.real(data), np.imag(data)], axis=1)
+    print("Opening saved torch Tensor....")
+    data = th.load(data_file)
 
     print("Shuffle data...")
-    for i in tqdm(range(data.shape[0] - 1)):
-        j = i + random.randint(0, sys.maxsize) // (sys.maxsize // (data.shape[0] - i) + 1)
+    for i in tqdm(range(data.size(0) - 1)):
+        j = i + random.randint(0, sys.maxsize) // (sys.maxsize // (data.size(0) - i) + 1)
 
         data[i, :, :], data[j, :, :] = data[j, :, :], data[i, :, :]
 
-    print(data.shape)
+    print(data.size())
 
     print("Creating pytorch stuff...")
 
     hidden_channel_size = values.N_FFT * 2 + 128
 
-    enc = Encoder(values.N_FFT * 2)
-    dec = Decoder(hidden_channel_size)
-    disc = Discriminator(hidden_channel_size)
+    enc = Encoder(values.N_FFT * 2).cuda()
+    dec = Decoder(hidden_channel_size).cuda()
+    disc = Discriminator(hidden_channel_size).cuda()
 
     hidden_length = values.SAMPLE_RATE * values.N_SECOND_TRAIN // values.N_FFT // 2 // 3
     print(f"Hidden layer size : {hidden_length}")
 
-    disc_loss_fn = DiscriminatorLoss()
-    ae_loss_fn = nn.MSELoss(reduction="none")
-
-    enc.cuda()
-    dec.cuda()
-
-    ae_loss_fn.cuda()
-
-    disc.cuda()
-    disc_loss_fn.cuda()
+    disc_loss_fn = DiscriminatorLoss().cuda()
+    ae_loss_fn = nn.MSELoss(reduction="none").cuda()
 
     optim_disc = th.optim.Adam(list(enc.parameters()) + list(disc.parameters()), lr=1e-8)
     optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=1e-6)
 
     batch_size = 4
-    nb_batch = ceil(data.shape[0] / batch_size)
+    nb_batch = ceil(data.size(0) / batch_size)
 
     nb_epoch = 15
 
@@ -113,9 +80,9 @@ def main() -> None:
         for b_idx in tqdm_pbar:
             i_min = b_idx * batch_size
             i_max = (b_idx + 1) * batch_size
-            i_max = i_max if i_max < data.shape[0] else data.shape[0]
+            i_max = i_max if i_max < data.size(0) else data.size(0)
 
-            x_batch = th.tensor(data[i_min:i_max], device=th.device("cuda"), dtype=th.float)
+            x_batch = data[i_min:i_max].cuda()
 
             out_enc = enc(x_batch)
 
