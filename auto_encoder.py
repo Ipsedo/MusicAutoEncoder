@@ -135,7 +135,6 @@ class Decoder1(nn.Module):
         super().__init__()
 
         n_layer = 4
-        self.n_layer = n_layer
 
         self.cnn_tr_dec = nn.Sequential(
             nn.ConvTranspose1d(n_channel + int(4 * n_channel / n_layer),
@@ -155,13 +154,13 @@ class Decoder1(nn.Module):
                                kernel_size=3, padding=1)
         )
 
-        self.n_channel = n_channel
+        self.n_channel = n_channel + int(4 * n_channel / n_layer)
 
     def forward(self, x):
         assert len(x.size()) == 3, \
             f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel + int(4 * self.n_channel / self.n_layer), \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel + int(4 * self.n_channel / self.n_layer)}."
+        assert x.size(1) == self.n_channel, \
+            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
         return self.cnn_tr_dec(x)
 
 

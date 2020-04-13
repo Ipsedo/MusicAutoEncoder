@@ -56,7 +56,7 @@ def main() -> None:
 
     if archi == "1":
         enc = auto_encoder.Encoder1(n_fft * 2)
-        dec = auto_encoder.Decoder1(n_fft * 2 * 2)
+        dec = auto_encoder.Decoder1(n_fft * 2)
         hidden_length = sample_rate // n_fft // 3 // 4 // 5
         hidden_channel = n_fft * 2 * 2
     elif archi == "2":

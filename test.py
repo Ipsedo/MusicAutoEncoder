@@ -38,7 +38,7 @@ def main() -> None:
     with th.no_grad():
         if archi == "1":
             enc = auto_encoder.Encoder1(n_fft * 2)
-            dec = auto_encoder.Decoder1(n_fft * 2 * 2)
+            dec = auto_encoder.Decoder1(n_fft * 2)
         elif archi == "2":
             enc = auto_encoder.Encoder2(n_fft * 2)
             dec = auto_encoder.Decoder2(n_fft * 2)
