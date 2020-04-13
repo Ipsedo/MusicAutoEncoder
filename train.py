@@ -11,13 +11,16 @@ import torch.nn as nn
 from math import ceil
 import random
 
-import values
-from auto_encoder import Encoder, Decoder, Discriminator, DiscriminatorLoss
+import auto_encoder
 
 
 def main() -> None:
     parser = argparse.ArgumentParser("Train audio auto-encoder")
 
+    parser.add_argument("--archi", type=str, choices=["small", "1", "2", "3"], dest="archi", required=True)
+    parser.add_argument("--n-fft", type=int, dest="n_fft", required=True)
+    parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
+    parser.add_argument("--second", type=int, required=True, dest="second")
     parser.add_argument("-d", "--data-file", type=str, required=True, dest="data_file")
     parser.add_argument("--out-model-dir", type=str, required=True, dest="out_dir")
 
@@ -25,6 +28,10 @@ def main() -> None:
 
     data_file = args.data_file
     out_dir = args.out_dir
+    archi = args.archi
+    n_fft = args.n_fft
+    sample_rate = args.sample_rate
+    second = args.second
 
     if exists(out_dir) and not isdir(out_dir):
         print("Model out path already exists and is not a directory !")
@@ -41,36 +48,67 @@ def main() -> None:
 
         data[i, :, :], data[j, :, :] = data[j, :, :], data[i, :, :]
 
+    data = data[:3000]
+
     print(data.size())
 
     print("Creating pytorch stuff...")
 
-    hidden_channel_size = values.N_FFT * 2 + 128
+    if archi == "1":
+        enc = auto_encoder.Encoder1(n_fft * 2)
+        dec = auto_encoder.Decoder1(n_fft * 2 * 2)
+        hidden_length = sample_rate // n_fft // 3 // 4 // 5
+        hidden_channel = n_fft * 2 * 2
+    elif archi == "2":
+        enc = auto_encoder.Encoder2(n_fft * 2)
+        dec = auto_encoder.Decoder2(n_fft * 2)
+        hidden_length = sample_rate // n_fft // 2 // 2 // 3 // 5
+        hidden_channel = n_fft * 2 * 2
+    elif archi == "3":
+        enc = auto_encoder.Encoder3(n_fft * 2)
+        dec = auto_encoder.Decoder3(n_fft * 2)
+        hidden_length = sample_rate // n_fft // 2 // 2 // 3
+        hidden_channel = n_fft * 2 * 2
+    elif archi == "small":
+        enc = auto_encoder.EncoderSmall(n_fft * 2)
+        dec = auto_encoder.DecoderSmall(n_fft * 2)
+        hidden_length = sample_rate // n_fft // 2 // 3
+        hidden_channel = n_fft * 2 + 128
+    else:
+        print(f"Unrecognized NN architecture ({archi}).")
+        print(f"Will load small CNN")
+        enc = auto_encoder.EncoderSmall(n_fft * 2)
+        dec = auto_encoder.DecoderSmall(n_fft * 2)
+        hidden_length = sample_rate // n_fft // 2 // 3
+        hidden_channel = n_fft * 2 + 128
 
-    enc = Encoder(values.N_FFT * 2).cuda()
-    dec = Decoder(hidden_channel_size).cuda()
-    disc = Discriminator(hidden_channel_size).cuda()
+    enc = enc.cuda()
+    dec = dec.cuda()
 
-    hidden_length = values.SAMPLE_RATE * values.N_SECOND_TRAIN // values.N_FFT // 2 // 3
+    hidden_length = second * hidden_length
+
+    disc = auto_encoder.Discriminator(hidden_channel).cuda()
+
     print(f"Hidden layer size : {hidden_length}")
 
-    disc_loss_fn = DiscriminatorLoss().cuda()
+    disc_loss_fn = auto_encoder.DiscriminatorLoss().cuda()
     ae_loss_fn = nn.MSELoss(reduction="none").cuda()
 
-    optim_disc = th.optim.Adam(list(enc.parameters()) + list(disc.parameters()), lr=1e-8)
+    optim_disc = th.optim.Adam(list(enc.parameters()) + list(disc.parameters()), lr=1e-7)
     optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=1e-6)
 
     batch_size = 4
     nb_batch = ceil(data.size(0) / batch_size)
 
-    nb_epoch = 15
+    nb_epoch = 10
 
     print("Start learning...")
     for e in range(nb_epoch):
         sum_loss_ae = 0
         sum_loss_disc = 0
 
-        nb_backward = 0
+        nb_backward_ae = 0
+        nb_backward_disc = 0
 
         enc.train()
         dec.train()
@@ -91,11 +129,7 @@ def main() -> None:
 
             out_dec = dec(out_enc)
 
-            loss_autoencoder = ae_loss_fn(out_dec, x_batch).mean(dim=1)
-
-            sum_loss_ae += loss_autoencoder.mean().item()
-
-            loss_autoencoder = loss_autoencoder.view(-1)
+            loss_autoencoder = ae_loss_fn(out_dec, x_batch).mean(dim=1).view(-1)
 
             batch_size_dec = 32
             nb_batch_dec = ceil(loss_autoencoder.size(0) / batch_size_dec)
@@ -105,28 +139,43 @@ def main() -> None:
                 i_max_dec = (b_idx_dec + 1) * batch_size_dec
                 i_max_dec = i_max_dec if i_max_dec < loss_autoencoder.size(0) else loss_autoencoder.size(0)
 
+                loss_ae = loss_autoencoder[i_min_dec:i_max_dec].mean()
+
                 optim_ae.zero_grad()
-                loss_autoencoder[i_min_dec:i_max_dec].mean().backward(retain_graph=True)
+                loss_ae.backward(retain_graph=True)
                 optim_ae.step()
 
-            d_z = disc(z)
-            d_z_prime = disc(z_prime)
+                nb_backward_ae += 1
+                sum_loss_ae += loss_ae.item()
 
-            loss_disc = disc_loss_fn(d_z_prime, d_z)
+            batch_size_disc = 8
+            nb_batch_disc = ceil(z.size(0) / batch_size_disc)
 
-            optim_disc.zero_grad()
-            loss_disc.backward()
-            optim_disc.step()
+            for b_idx_disc in range(nb_batch_disc):
+                i_min_disc = b_idx_disc * batch_size_disc
+                i_max_disc = (b_idx_disc + 1) * batch_size_disc
+                i_max_disc = i_max_disc if i_max_disc < z.size(0) else z.size(0)
 
-            sum_loss_disc += loss_disc.item()
+                b_z = z[i_min_disc:i_max_disc]
+                b_z_prime = z_prime[i_min_disc:i_max_disc]
 
-            nb_backward += 1
+                d_z = disc(b_z)
+                d_z_prime = disc(b_z_prime)
+
+                loss_disc = disc_loss_fn(d_z_prime, d_z)
+
+                optim_disc.zero_grad()
+                loss_disc.backward(retain_graph=True)
+                optim_disc.step()
+
+                sum_loss_disc += loss_disc.item()
+                nb_backward_disc += 1
 
             tqdm_pbar.set_description("Epoch {} : loss_ae_avg = {:.6f}, loss_disc_avg = {:.6f} "
-                                      .format(e, sum_loss_ae / nb_backward, sum_loss_disc / nb_backward))
+                                      .format(e, sum_loss_ae / nb_backward_ae, sum_loss_disc / nb_backward_disc))
 
-        th.save(enc.state_dict(), join(out_dir, f"Encoder_epoch-{e}.th"))
-        th.save(dec.state_dict(), join(out_dir, f"Decoder_epoch-{e}.th"))
+        th.save(enc.state_dict(), join(out_dir, f"Encoder2_epoch-{e}.th"))
+        th.save(dec.state_dict(), join(out_dir, f"Decoder2_epoch-{e}.th"))
         th.save(optim_ae.state_dict(), join(out_dir, f"optim_ae_epoch-{e}.th"))
         th.save(ae_loss_fn.state_dict(), join(out_dir, f"loss_ae_fn_epoch-{e}.th"))
 

@@ -1,8 +1,6 @@
 import torch as th
 import torch.nn as nn
 
-import values
-
 
 # Pourri
 class ConstantUnpool1d(nn.Module):
@@ -38,7 +36,11 @@ class RandomZeroUnpool1d(ConstantUnpool1d):
         return (res * mask).flatten(-2, -1)
 
 
-class Encoder(nn.Module):
+####################################################
+# Auto Encoder Small - designed for n_fft = 150
+####################################################
+
+class EncoderSmall(nn.Module):
     def __init__(self, n_channel):
         super().__init__()
 
@@ -64,18 +66,18 @@ class Encoder(nn.Module):
         return self.cnn_enc(x)
 
 
-class Decoder(nn.Module):
+class DecoderSmall(nn.Module):
     def __init__(self, n_channel):
         super().__init__()
 
         self.cnn_tr_dec = nn.Sequential(
-            nn.ConvTranspose1d(n_channel, n_channel - 128,
+            nn.ConvTranspose1d(n_channel, n_channel + 64,
                                kernel_size=7, stride=3, padding=2),
-            nn.BatchNorm1d(n_channel - 128),
-            nn.ConvTranspose1d(n_channel - 128, n_channel - (128 + 64),
+            nn.BatchNorm1d(n_channel + 64),
+            nn.ConvTranspose1d(n_channel + 64, n_channel + 32,
                                kernel_size=5, stride=2, output_padding=1, padding=2),
-            nn.BatchNorm1d(n_channel - (128 + 64)),
-            nn.ConvTranspose1d(n_channel - (128 + 64), values.N_FFT * 2,
+            nn.BatchNorm1d(n_channel + 32),
+            nn.ConvTranspose1d(n_channel + 32, n_channel,
                                kernel_size=3, padding=1)
         )
 
@@ -89,26 +91,235 @@ class Decoder(nn.Module):
         return self.cnn_tr_dec(x)
 
 
-class AutoEncoder(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.in_channel_enc = values.N_FFT * 2
-        self.in_channel_dec = values.N_FFT * 2 + 128
+####################################################
+# Auto Encoder 1 - designed for n_fft = 147
+####################################################
 
-        self.enc = Encoder(self.in_channel_enc)
-        self.dec = Decoder(self.in_channel_dec)
+class Encoder1(nn.Module):
+    def __init__(self, n_channel):
+        super().__init__()
+
+        n_layer = 4
+
+        self.cnn_enc = nn.Sequential(
+            nn.Conv1d(n_channel, n_channel + int(n_channel / n_layer),
+                      kernel_size=3, padding=1),
+            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
+            nn.Conv1d(n_channel + int(n_channel / n_layer),
+                      n_channel + int(2 * n_channel / n_layer),
+                      kernel_size=7, stride=3, padding=3),
+            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
+            nn.Conv1d(n_channel + int(2 * n_channel / n_layer),
+                      n_channel + int(3 * n_channel / n_layer),
+                      kernel_size=9, stride=4, padding=4),
+            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
+            nn.Conv1d(n_channel + int(3 * n_channel / n_layer),
+                      n_channel + int(4 * n_channel / n_layer),
+                      kernel_size=11, stride=5, padding=5),
+            nn.BatchNorm1d(n_channel + int(4 * n_channel / n_layer))
+
+        )
+
+        self.n_channel = n_channel
 
     def forward(self, x):
         assert len(x.size()) == 3, \
             f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.in_channel_enc, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.in_channel_enc}."
+        assert x.size(1) == self.n_channel, \
+            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+        return self.cnn_enc(x)
 
-        out_enc = self.enc(x)
-        out_dec = self.dec(out_enc)
 
-        return out_enc, out_dec
+class Decoder1(nn.Module):
+    def __init__(self, n_channel):
+        super().__init__()
 
+        n_layer = 4
+        self.n_layer = n_layer
+
+        self.cnn_tr_dec = nn.Sequential(
+            nn.ConvTranspose1d(n_channel + int(4 * n_channel / n_layer),
+                               n_channel + int(3 * n_channel / n_layer),
+                               kernel_size=11, stride=5, padding=3),
+            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
+            nn.ConvTranspose1d(n_channel + int(3 * n_channel / n_layer),
+                               n_channel + int(2 * n_channel / n_layer),
+                               kernel_size=9, stride=4, padding=3, output_padding=1),
+            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
+            nn.ConvTranspose1d(n_channel + int(2 * n_channel / n_layer),
+                               n_channel + int(n_channel / n_layer),
+                               kernel_size=7, stride=3, padding=2),
+            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
+            nn.ConvTranspose1d(n_channel + int(n_channel / n_layer),
+                               n_channel,
+                               kernel_size=3, padding=1)
+        )
+
+        self.n_channel = n_channel
+
+    def forward(self, x):
+        assert len(x.size()) == 3, \
+            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
+        assert x.size(1) == self.n_channel + int(4 * self.n_channel / self.n_layer), \
+            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel + int(4 * self.n_channel / self.n_layer)}."
+        return self.cnn_tr_dec(x)
+
+
+####################################################
+# Auto Encoder 2 - designed for n_fft = 147
+####################################################
+
+class Encoder2(nn.Module):
+    def __init__(self, n_channel: int):
+        super().__init__()
+
+        n_layer = 5
+
+        self.cnn_enc = nn.Sequential(
+            nn.Conv1d(n_channel, n_channel + int(n_channel / n_layer),
+                      kernel_size=3, padding=1),
+            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
+            nn.Conv1d(n_channel + int(n_channel / n_layer),
+                      n_channel + int(2 * n_channel / n_layer),
+                      kernel_size=5, stride=2, padding=2),
+            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
+            nn.Conv1d(n_channel + int(2 * n_channel / n_layer),
+                      n_channel + int(3 * n_channel / n_layer),
+                      kernel_size=5, stride=2, padding=2),
+            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
+            nn.Conv1d(n_channel + int(3 * n_channel / n_layer),
+                      n_channel + int(4 * n_channel / n_layer),
+                      kernel_size=7, stride=3, padding=2),
+            nn.BatchNorm1d(n_channel + int(4 * n_channel / n_layer)),
+            nn.Conv1d(n_channel + int(4 * n_channel / n_layer),
+                      n_channel + int(5 * n_channel / n_layer),
+                      kernel_size=11, stride=5, padding=5),
+            nn.BatchNorm1d(n_channel + int(5 * n_channel / n_layer))
+        )
+
+        self.n_channel = n_channel
+
+    def forward(self, x):
+        assert len(x.size()) == 3, \
+            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
+        assert x.size(1) == self.n_channel, \
+            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+        return self.cnn_enc(x)
+
+
+class Decoder2(nn.Module):
+    def __init__(self, n_channel: int):
+        super().__init__()
+
+        n_layer = 5
+
+        self.cnn_tr_dec = nn.Sequential(
+            nn.ConvTranspose1d(n_channel * 2,
+                               n_channel + int(4 * n_channel / n_layer),
+                               kernel_size=11, stride=5, padding=3),
+            nn.BatchNorm1d(n_channel + int(4 * n_channel / n_layer)),
+            nn.ConvTranspose1d(n_channel + int(4 * n_channel / n_layer),
+                               n_channel + int(3 * n_channel / n_layer),
+                               kernel_size=7, stride=3, padding=2),
+            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
+            nn.ConvTranspose1d(n_channel + int(3 * n_channel / n_layer),
+                               n_channel + int(2 * n_channel / n_layer),
+                               kernel_size=5, stride=2, padding=2, output_padding=1),
+            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
+            nn.ConvTranspose1d(n_channel + int(2 * n_channel / n_layer),
+                               n_channel + int(n_channel / n_layer),
+                               kernel_size=5, stride=2, padding=2, output_padding=1),
+            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
+            nn.ConvTranspose1d(n_channel + int(n_channel / n_layer),
+                               n_channel,
+                               kernel_size=3, padding=1)
+        )
+
+        self.n_channel = n_channel * 2
+
+    def forward(self, x):
+        assert len(x.size()) == 3, \
+            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
+        assert x.size(1) == self.n_channel, \
+            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+        return self.cnn_tr_dec(x)
+
+
+####################################################
+# Auto Encoder 2 - designed for n_fft = 147
+####################################################
+
+class Encoder3(nn.Module):
+    def __init__(self, n_channel: int):
+        super().__init__()
+
+        n_layer = 4
+        self.cnn_enc = nn.Sequential(
+            nn.Conv1d(n_channel,
+                      n_channel + int(n_channel / n_layer),
+                      kernel_size=3, padding=1),
+            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
+            nn.Conv1d(n_channel + int(n_channel / n_layer),
+                      n_channel + int(2 * n_channel / n_layer),
+                      kernel_size=5, stride=2, padding=2),
+            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
+            nn.Conv1d(n_channel + int(2 * n_channel / n_layer),
+                      n_channel + int(3 * n_channel / n_layer),
+                      kernel_size=5, stride=2, padding=2),
+            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
+            nn.Conv1d(n_channel + int(3 * n_channel / n_layer),
+                      n_channel + int(4 * n_channel / n_layer),
+                      kernel_size=7, stride=3, padding=3),
+            nn.BatchNorm1d(n_channel + int(4 * n_channel / n_layer))
+        )
+
+        self.n_channel = n_channel
+
+    def forward(self, x):
+        assert len(x.size()) == 3, \
+            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
+        assert x.size(1) == self.n_channel, \
+            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+        return self.cnn_enc(x)
+
+
+class Decoder3(nn.Module):
+    def __init__(self, n_channel: int):
+        super().__init__()
+
+        n_layer = 4
+
+        self.cnn_tr_dec = nn.Sequential(
+            nn.ConvTranspose1d(n_channel + int(4 * n_channel / n_layer),
+                               n_channel + int(3 * n_channel / n_layer),
+                               kernel_size=7, stride=3, padding=2),
+            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
+            nn.ConvTranspose1d(n_channel + int(3 * n_channel / n_layer),
+                               n_channel + int(2 * n_channel / n_layer),
+                               kernel_size=5, stride=2, padding=2, output_padding=1),
+            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
+            nn.ConvTranspose1d(n_channel + int(2 * n_channel / n_layer),
+                               n_channel + int(n_channel / n_layer),
+                               kernel_size=5, stride=2, padding=2, output_padding=1),
+            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
+            nn.ConvTranspose1d(n_channel + int(n_channel / n_layer),
+                               n_channel,
+                               kernel_size=3, padding=1)
+        )
+
+        self.n_channel = n_channel + int(4 * n_channel / n_layer)
+
+    def forward(self, x):
+        assert len(x.size()) == 3, \
+            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
+        assert x.size(1) == self.n_channel, \
+            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+        return self.cnn_tr_dec(x)
+
+
+####################################################
+# Discriminator stuff
+####################################################
 
 class Discriminator(nn.Module):
     def __init__(self, n_channel):

@@ -5,14 +5,15 @@ import numpy as np
 
 from scipy.io import wavfile
 
-from auto_encoder import Encoder, Decoder
+import auto_encoder
 import read_audio
-import values
 
 
 def main() -> None:
     parser = argparse.ArgumentParser("Generate Audio main")
 
+    parser.add_argument("--archi", type=str, choices=["small", "1", "2"], dest="archi", required=True)
+    parser.add_argument("--n-fft", type=int, dest="n_fft", required=True)
     parser.add_argument("-e", "--encoder-path", type=str, required=True, dest="encoder_path")
     parser.add_argument("-d", "--decoder-path", type=str, required=True, dest="decoder_path")
     parser.add_argument("-i", "--input-wav", type=str, required=True, dest="input_wav")
@@ -22,10 +23,12 @@ def main() -> None:
     encoder_path = args.encoder_path
     decoder_path = args.decoder_path
     input_wav = args.input_wav
+    archi = args.archi
+    n_fft = args.n_fft
 
     audio_data = read_audio.open_wav(input_wav, 1000)[1]
     print(audio_data.shape)
-    fft_data = read_audio.fft_raw_audio(audio_data, values.N_FFT)
+    fft_data = read_audio.fft_raw_audio(audio_data, n_fft)
 
     data_real = np.real(fft_data)
     data_img = np.imag(fft_data)
@@ -33,8 +36,20 @@ def main() -> None:
     data = th.tensor(np.concatenate([data_real, data_img], axis=2)).to(th.float).permute(0, 2, 1)
 
     with th.no_grad():
-        enc = Encoder(values.N_FFT * 2)
-        dec = Decoder(values.N_FFT * 2 + 128)
+        if archi == "1":
+            enc = auto_encoder.Encoder1(n_fft * 2)
+            dec = auto_encoder.Decoder1(n_fft * 2 * 2)
+        elif archi == "2":
+            enc = auto_encoder.Encoder2(n_fft * 2)
+            dec = auto_encoder.Decoder2(n_fft * 2)
+        elif archi == "small":
+            enc = auto_encoder.EncoderSmall(n_fft * 2)
+            dec = auto_encoder.DecoderSmall(n_fft * 2)
+        else:
+            print(f"Unrecognized NN architecture ({archi}).")
+            print(f"Will load small CNN")
+            enc = auto_encoder.EncoderSmall(n_fft * 2)
+            dec = auto_encoder.DecoderSmall(n_fft * 2)
 
         enc.load_state_dict(th.load(encoder_path))
         dec.load_state_dict(th.load(decoder_path))
@@ -48,13 +63,13 @@ def main() -> None:
         print(out_enc.mean(dim=1).min(), out_enc.mean(dim=1).max())
         out_dec = dec(out_enc)
 
-        re_out = out_dec[:, :values.N_FFT, :].numpy()
-        img_out = out_dec[:, values.N_FFT:, :].numpy()
+        re_out = out_dec[:, :n_fft, :].numpy()
+        img_out = out_dec[:, n_fft:, :].numpy()
         cplx_out = (re_out + 1j * img_out).astype(np.complex128)
 
         print(cplx_out.shape)
 
-        raw_audio = read_audio.ifft_samples(cplx_out, values.N_FFT)
+        raw_audio = read_audio.ifft_samples(cplx_out, n_fft)
         raw_audio = raw_audio# / np.linalg.norm(raw_audio)
         print(raw_audio.shape)
 

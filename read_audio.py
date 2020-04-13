@@ -15,8 +15,6 @@ from typing import Tuple
 
 from tqdm import tqdm
 
-import values
-
 
 ###############
 # WAV stuff
@@ -124,30 +122,30 @@ def ifft_samples(fft_samples: np.ndarray, nfft: int) -> np.ndarray:
 # Main
 ###############
 
-def __read_wavs_without_copy(wav_root: str, nb_wav: int) -> th.Tensor:
+def __read_wavs_without_copy(wav_root: str, nb_wav: int, sample_rate: int, n_fft: int, sec: int) -> th.Tensor:
     wav_files = [join(wav_root, f) for f in listdir(wav_root) if splitext(f)[-1] == ".wav"]
 
     if len(wav_files) > nb_wav:
         wav_files = wav_files[:nb_wav]
 
-    n_channel = values.N_FFT * 2
-    fft_split_size = values.SAMPLE_RATE * values.N_SECOND_TRAIN // values.N_FFT
+    n_channel = n_fft * 2
+    fft_split_size = sample_rate * sec // n_fft
     n_sample = 0
 
     for w in tqdm(wav_files):
-        n_sample += compute_wav_size(w, values.N_SECOND_TRAIN * 1000)[0]
+        n_sample += compute_wav_size(w, sec * 1000)[0]
 
     data = th.zeros(n_sample, n_channel, fft_split_size, dtype=th.float)
 
     curr_split = 0
 
     for w in tqdm(wav_files):
-        _, raw_audio = open_wav(w, values.N_SECOND_TRAIN * 1000)
-        fft_audio = fft_raw_audio(raw_audio, values.N_FFT).transpose((0, 2, 1))
+        _, raw_audio = open_wav(w, sec * 1000)
+        fft_audio = fft_raw_audio(raw_audio, n_fft).transpose((0, 2, 1))
 
-        data[curr_split:curr_split + fft_audio.shape[0], :values.N_FFT, :] = \
+        data[curr_split:curr_split + fft_audio.shape[0], :n_fft, :] = \
             th.tensor(np.real(fft_audio), dtype=th.float)
-        data[curr_split:curr_split + fft_audio.shape[0], values.N_FFT:, :] = \
+        data[curr_split:curr_split + fft_audio.shape[0], n_fft:, :] = \
             th.tensor(np.imag(fft_audio), dtype=th.float)
 
         curr_split += fft_audio.shape[0]
@@ -173,6 +171,9 @@ def main() -> None:
     save_parser.add_argument("--wav-root", type=str, dest="wav_root", required=True)
     save_parser.add_argument("-n", "--nb-wav", type=int, default=400, dest="nb_wav")
     save_parser.add_argument("-o", "--out-tensor-file", type=str, dest="out_tensor_file", required=True)
+    save_parser.add_argument("--n-fft", type=int, dest="n_fft", required=True)
+    save_parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
+    save_parser.add_argument("-s", "--second", type=int, required=True, dest="second")
 
     args = parser.parse_args()
 
@@ -229,7 +230,7 @@ def main() -> None:
     elif args.mode == "process":
         convert_mp3_to_wav(args.audio_root, args.out_dir, args.limit)
     elif args.mode == "save":
-        data = __read_wavs_without_copy(args.wav_root, args.nb_wav)
+        data = __read_wavs_without_copy(args.wav_root, args.nb_wav, args.sample_rate, args.n_fft, args.second)
         th.save(data, args.out_tensor_file)
 
 
