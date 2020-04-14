@@ -41,28 +41,20 @@ def main() -> None:
         print(f"Loading model \"{model_path}\"")
 
         if archi == "1":
-            dec = auto_encoder.Decoder1(n_fft * 2)
-            hidden_length = sample_rate // n_fft // 3 // 4 // 5
-            hidden_channel = n_fft * 2 * 2
+            dec = auto_encoder.Decoder1(n_fft)
         elif archi == "2":
-            dec = auto_encoder.Decoder2(n_fft * 2)
-            hidden_length = sample_rate // n_fft // 2 // 2 // 3 // 5
-            hidden_channel = n_fft * 2 * 2
+            dec = auto_encoder.Decoder2(n_fft)
         elif archi == "3":
-            dec = auto_encoder.Decoder3(n_fft * 2)
-            hidden_length = sample_rate // n_fft // 2 // 2 // 3
-            hidden_channel = n_fft * 2 * 2
+            dec = auto_encoder.Decoder3(n_fft)
         elif archi == "small":
-            dec = auto_encoder.DecoderSmall(n_fft * 2)
-            hidden_length = sample_rate // n_fft // 2 // 3
-            hidden_channel = n_fft * 2 + 128
+            dec = auto_encoder.DecoderSmall(n_fft)
         else:
             print(f"Unrecognized NN architecture ({archi}).")
             print(f"Will load small CNN")
-            dec = auto_encoder.DecoderSmall(n_fft * 2)
-            hidden_length = sample_rate // n_fft // 2 // 3
-            hidden_channel = n_fft * 2 + 128
+            dec = auto_encoder.DecoderSmall(n_fft)
 
+        hidden_length = sample_rate // n_fft // dec.division_factor()
+        hidden_channel = dec.get_hidden_size()
         dec.load_state_dict(th.load(model_path))
 
         print("Random hidden representation generation")
