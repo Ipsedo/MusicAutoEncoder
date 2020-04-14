@@ -12,7 +12,7 @@ import read_audio
 def main() -> None:
     parser = argparse.ArgumentParser("Generate Audio main")
 
-    parser.add_argument("--archi", type=str, choices=["small", "1", "2"], dest="archi", required=True)
+    parser.add_argument("--archi", type=str, choices=["small", "1", "2", "3"], dest="archi", required=True)
     parser.add_argument("--n-fft", type=int, dest="n_fft", required=True)
     parser.add_argument("-e", "--encoder-path", type=str, required=True, dest="encoder_path")
     parser.add_argument("-d", "--decoder-path", type=str, required=True, dest="decoder_path")
@@ -42,6 +42,9 @@ def main() -> None:
         elif archi == "2":
             enc = auto_encoder.Encoder2(n_fft * 2)
             dec = auto_encoder.Decoder2(n_fft * 2)
+        elif archi == "3":
+            enc = auto_encoder.Encoder3(n_fft * 2)
+            dec = auto_encoder.Decoder3(n_fft * 2)
         elif archi == "small":
             enc = auto_encoder.EncoderSmall(n_fft * 2)
             dec = auto_encoder.DecoderSmall(n_fft * 2)
