@@ -20,6 +20,7 @@ def main() -> None:
     parser.add_argument("--n-fft", type=int, dest="n_fft", required=True)
     parser.add_argument("-e", "--encoder-path", type=str, required=True, dest="encoder_path")
     parser.add_argument("-d", "--decoder-path", type=str, required=True, dest="decoder_path")
+    parser.add_argument("-m", "--mode", type=str, choices=["mean", "random", "alternated"])
     parser.add_argument("--input-wavs", nargs="+", type=str, required=True, dest="input_wavs")
     parser.add_argument("--sample-index", type=int, required=True, dest="sample_index")
     parser.add_argument("--nb-sample", type=int, required=True, dest="nb_sample")
@@ -48,29 +49,54 @@ def main() -> None:
 
     with th.no_grad():
         if archi == "1":
-            enc = auto_encoder.Encoder1(n_fft * 2)
-            dec = auto_encoder.Decoder1(n_fft * 2)
+            enc = auto_encoder.Encoder1(n_fft)
+            dec = auto_encoder.Decoder1(n_fft)
         elif archi == "2":
-            enc = auto_encoder.Encoder2(n_fft * 2)
-            dec = auto_encoder.Decoder2(n_fft * 2)
+            enc = auto_encoder.Encoder2(n_fft)
+            dec = auto_encoder.Decoder2(n_fft)
         elif archi == "3":
-            enc = auto_encoder.Encoder3(n_fft * 2)
-            dec = auto_encoder.Decoder3(n_fft * 2)
+            enc = auto_encoder.Encoder3(n_fft)
+            dec = auto_encoder.Decoder3(n_fft)
         elif archi == "small":
-            enc = auto_encoder.EncoderSmall(n_fft * 2)
-            dec = auto_encoder.DecoderSmall(n_fft * 2)
+            enc = auto_encoder.EncoderSmall(n_fft)
+            dec = auto_encoder.DecoderSmall(n_fft)
         else:
             print(f"Unrecognized NN architecture ({archi}).")
             print(f"Will load small CNN")
-            enc = auto_encoder.EncoderSmall(n_fft * 2)
-            dec = auto_encoder.DecoderSmall(n_fft * 2)
+            enc = auto_encoder.EncoderSmall(n_fft)
+            dec = auto_encoder.DecoderSmall(n_fft)
 
         enc.load_state_dict(th.load(encoder_path))
         dec.load_state_dict(th.load(decoder_path))
 
-        hidden_mean = th.stack([enc(d[sample_index:sample_index + nb_sample, :, :]) for d in datas], dim=0).mean(dim=0)
+        hidden = th.stack([enc(d[sample_index:sample_index + nb_sample, :, :]) for d in datas], dim=0)
 
-        out_dec = dec(hidden_mean)
+        print(hidden.size())
+
+        if args.mode == "mean":
+            hidden = hidden.mean(dim=0)
+        elif args.mode == "random":
+            rand_idx = th.randint(0, hidden.size(0), (hidden.size(1) * hidden.size(3),))
+            hidden = hidden.permute(1, 3, 0, 2).flatten(0, 1)
+            res = th.zeros(hidden.size(0), hidden.size(2))
+
+            for i in tqdm(range(res.size(0))):
+                res[i] = hidden[i, rand_idx[i], :]
+            hidden = res.permute(1, 0).unsqueeze(0)
+        elif args.mode == "alternated":
+            idx = th.cat([th.arange(hidden.size(0)) for _ in range(hidden.size(1) * hidden.size(3) // hidden.size(0))])
+            idx = th.cat([idx, th.zeros(hidden.size(0) - idx.size(0)).to(th.long)])
+            hidden = hidden.permute(1, 3, 0, 2).flatten(0, 1)
+            res = th.zeros(hidden.size(0), hidden.size(2))
+
+            for i in tqdm(range(res.size(0))):
+                res[i] = hidden[i, idx[i], :]
+            hidden = res.permute(1, 0).unsqueeze(0)
+        else:
+            print("Unrecognized mode, will start mean")
+            hidden = hidden.mean(dim=0)
+
+        out_dec = dec(hidden)
 
         re_out = out_dec[:, :n_fft, :].numpy()
         img_out = out_dec[:, n_fft:, :].numpy()
