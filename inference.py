@@ -37,22 +37,22 @@ def main() -> None:
 
     with th.no_grad():
         if archi == "1":
-            enc = auto_encoder.Encoder1(n_fft * 2)
-            dec = auto_encoder.Decoder1(n_fft * 2)
+            enc = auto_encoder.Encoder1(n_fft)
+            dec = auto_encoder.Decoder1(n_fft)
         elif archi == "2":
-            enc = auto_encoder.Encoder2(n_fft * 2)
-            dec = auto_encoder.Decoder2(n_fft * 2)
+            enc = auto_encoder.Encoder2(n_fft)
+            dec = auto_encoder.Decoder2(n_fft)
         elif archi == "3":
-            enc = auto_encoder.Encoder3(n_fft * 2)
-            dec = auto_encoder.Decoder3(n_fft * 2)
+            enc = auto_encoder.Encoder3(n_fft)
+            dec = auto_encoder.Decoder3(n_fft)
         elif archi == "small":
-            enc = auto_encoder.EncoderSmall(n_fft * 2)
-            dec = auto_encoder.DecoderSmall(n_fft * 2)
+            enc = auto_encoder.EncoderSmall(n_fft)
+            dec = auto_encoder.DecoderSmall(n_fft)
         else:
             print(f"Unrecognized NN architecture ({archi}).")
             print(f"Will load small CNN")
-            enc = auto_encoder.EncoderSmall(n_fft * 2)
-            dec = auto_encoder.DecoderSmall(n_fft * 2)
+            enc = auto_encoder.EncoderSmall(n_fft)
+            dec = auto_encoder.DecoderSmall(n_fft)
 
         enc.load_state_dict(th.load(encoder_path))
         dec.load_state_dict(th.load(decoder_path))
