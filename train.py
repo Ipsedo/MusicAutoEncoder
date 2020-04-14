@@ -20,18 +20,18 @@ def main() -> None:
     parser.add_argument("--archi", type=str, choices=["small", "1", "2", "3"], dest="archi", required=True)
     parser.add_argument("--n-fft", type=int, dest="n_fft", required=True)
     parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
-    parser.add_argument("--second", type=int, required=True, dest="second")
-    parser.add_argument("-d", "--data-file", type=str, required=True, dest="data_file")
+    parser.add_argument("--seconds", type=int, required=True, dest="seconds")
+    parser.add_argument("--tensor-file", type=str, required=True, dest="tensor_file")
     parser.add_argument("--out-model-dir", type=str, required=True, dest="out_dir")
 
     args = parser.parse_args()
 
-    data_file = args.data_file
+    tensor_file = args.tensor_file
     out_dir = args.out_dir
     archi = args.archi
     n_fft = args.n_fft
     sample_rate = args.sample_rate
-    second = args.second
+    seconds = args.seconds
 
     if exists(out_dir) and not isdir(out_dir):
         print("Model out path already exists and is not a directory !")
@@ -40,7 +40,7 @@ def main() -> None:
         mkdir(out_dir)
 
     print("Opening saved torch Tensor....")
-    data = th.load(data_file)
+    data = th.load(tensor_file)
 
     print("Shuffle data...")
     for i in tqdm(range(data.size(0) - 1)):
@@ -48,7 +48,7 @@ def main() -> None:
 
         data[i, :, :], data[j, :, :] = data[j, :, :], data[i, :, :]
 
-    data = data[:3000]
+    data = data[:18000]
 
     print(data.size())
 
@@ -85,7 +85,7 @@ def main() -> None:
     enc = enc.cuda()
     dec = dec.cuda()
 
-    hidden_length = second * hidden_length
+    hidden_length = seconds * hidden_length
 
     disc = auto_encoder.Discriminator(hidden_channel).cuda()
 
@@ -94,8 +94,8 @@ def main() -> None:
     disc_loss_fn = auto_encoder.DiscriminatorLoss().cuda()
     ae_loss_fn = nn.MSELoss(reduction="none").cuda()
 
-    optim_disc = th.optim.Adam(list(enc.parameters()) + list(disc.parameters()), lr=1e-7)
-    optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=1e-6)
+    optim_disc = th.optim.Adam(list(enc.parameters()) + list(disc.parameters()), lr=1e-8)
+    optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=1e-5)
 
     batch_size = 4
     nb_batch = ceil(data.size(0) / batch_size)
@@ -171,15 +171,16 @@ def main() -> None:
                 sum_loss_disc += loss_disc.item()
                 nb_backward_disc += 1
 
-            tqdm_pbar.set_description("Epoch {} : loss_ae_avg = {:.6f}, loss_disc_avg = {:.6f} "
-                                      .format(e, sum_loss_ae / nb_backward_ae, sum_loss_disc / nb_backward_disc))
+            tqdm_pbar.set_description(f"Epoch {e:2d} : "
+                                      f"loss_ae_avg = {sum_loss_ae / nb_backward_ae:.6f}, "
+                                      f"loss_disc_avg = {sum_loss_disc / nb_backward_disc:.6f} ")
 
-        th.save(enc.state_dict(), join(out_dir, f"Encoder2_epoch-{e}.th"))
-        th.save(dec.state_dict(), join(out_dir, f"Decoder2_epoch-{e}.th"))
+        th.save(enc.state_dict(), join(out_dir, f"{enc}_epoch-{e}.th"))
+        th.save(dec.state_dict(), join(out_dir, f"{dec}_epoch-{e}.th"))
         th.save(optim_ae.state_dict(), join(out_dir, f"optim_ae_epoch-{e}.th"))
         th.save(ae_loss_fn.state_dict(), join(out_dir, f"loss_ae_fn_epoch-{e}.th"))
 
-        th.save(disc.state_dict(), join(out_dir, f"Discriminator_epoch-{e}.th"))
+        th.save(disc.state_dict(), join(out_dir, f"{disc}_epoch-{e}.th"))
         th.save(optim_disc.state_dict(), join(out_dir, f"optim_disc_epoch-{e}.th"))
         th.save(disc_loss_fn.state_dict(), join(out_dir, f"loss_disc_fn_epoch-{e}.th"))
 
