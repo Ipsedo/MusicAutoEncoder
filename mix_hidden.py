@@ -17,7 +17,7 @@ def main() -> None:
     parser = argparse.ArgumentParser("Generate Audio main")
 
     parser.add_argument("--archi", type=str, choices=["small", "1", "2", "3"], dest="archi", required=True)
-    parser.add_argument("--n-fft", type=int, dest="n_fft", required=True)
+    parser.add_argument("--nfft", type=int, dest="n_fft", required=True)
     parser.add_argument("-e", "--encoder-path", type=str, required=True, dest="encoder_path")
     parser.add_argument("-d", "--decoder-path", type=str, required=True, dest="decoder_path")
     parser.add_argument("-m", "--mode", type=str, choices=["mean", "random", "alternated"])

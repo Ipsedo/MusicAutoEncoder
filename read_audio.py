@@ -196,7 +196,7 @@ def main() -> None:
     save_parser.add_argument("--wav-root", type=str, dest="wav_root", required=True)
     save_parser.add_argument("-n", "--nb-wav", type=int, default=400, dest="nb_wav")
     save_parser.add_argument("-o", "--out-tensor-file", type=str, dest="out_tensor_file", required=True)
-    save_parser.add_argument("--n-fft", type=int, dest="n_fft", required=True)
+    save_parser.add_argument("--nfft", type=int, dest="n_fft", required=True)
     save_parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
     save_parser.add_argument("-s", "--second", type=int, required=True, dest="second")
 

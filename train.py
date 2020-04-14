@@ -18,7 +18,7 @@ def main() -> None:
     parser = argparse.ArgumentParser("Train audio auto-encoder")
 
     parser.add_argument("--archi", type=str, choices=["small", "1", "2", "3"], dest="archi", required=True)
-    parser.add_argument("--n-fft", type=int, dest="n_fft", required=True)
+    parser.add_argument("--nfft", type=int, dest="n_fft", required=True)
     parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
     parser.add_argument("--seconds", type=int, required=True, dest="seconds")
     parser.add_argument("--tensor-file", type=str, required=True, dest="tensor_file")
