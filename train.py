@@ -22,6 +22,8 @@ def main() -> None:
     parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
     parser.add_argument("--seconds", type=int, required=True, dest="seconds")
     parser.add_argument("--tensor-file", type=str, required=True, dest="tensor_file")
+    parser.add_argument("--lr-ae", type=float, default=1e-6, dest="lr_auto_encoder")
+    parser.add_argument("--lr-disc", type=float, default=1e-9, dest="lr_discriminator")
     parser.add_argument("--out-model-dir", type=str, required=True, dest="out_dir")
 
     args = parser.parse_args()
@@ -32,6 +34,8 @@ def main() -> None:
     n_fft = args.n_fft
     sample_rate = args.sample_rate
     seconds = args.seconds
+    lr_auto_encoder = args.lr_auto_encoder
+    lr_discriminator = args.lr_discriminator
 
     if exists(out_dir) and not isdir(out_dir):
         print("Model out path already exists and is not a directory !")
@@ -55,33 +59,25 @@ def main() -> None:
     print("Creating pytorch stuff...")
 
     if archi == "1":
-        enc = auto_encoder.Encoder1(n_fft * 2)
-        dec = auto_encoder.Decoder1(n_fft * 2)
-        hidden_length = sample_rate // n_fft // 3 // 4 // 5
-        hidden_channel = n_fft * 2 * 2
+        enc = auto_encoder.Encoder1(n_fft)
+        dec = auto_encoder.Decoder1(n_fft)
     elif archi == "2":
-        enc = auto_encoder.Encoder2(n_fft * 2)
-        dec = auto_encoder.Decoder2(n_fft * 2)
-        hidden_length = sample_rate // n_fft // 2 // 2 // 3 // 5
-        hidden_channel = n_fft * 2 * 2
+        enc = auto_encoder.Encoder2(n_fft)
+        dec = auto_encoder.Decoder2(n_fft)
     elif archi == "3":
-        enc = auto_encoder.Encoder3(n_fft * 2)
-        dec = auto_encoder.Decoder3(n_fft * 2)
-        hidden_length = sample_rate // n_fft // 2 // 2 // 3
-        hidden_channel = n_fft * 2 * 2
+        enc = auto_encoder.Encoder3(n_fft)
+        dec = auto_encoder.Decoder3(n_fft)
     elif archi == "small":
-        enc = auto_encoder.EncoderSmall(n_fft * 2)
-        dec = auto_encoder.DecoderSmall(n_fft * 2)
-        hidden_length = sample_rate // n_fft // 2 // 3
-        hidden_channel = n_fft * 2 + 128
+        enc = auto_encoder.EncoderSmall(n_fft)
+        dec = auto_encoder.DecoderSmall(n_fft)
     else:
         print(f"Unrecognized NN architecture ({archi}).")
         print(f"Will load small CNN")
-        enc = auto_encoder.EncoderSmall(n_fft * 2)
-        dec = auto_encoder.DecoderSmall(n_fft * 2)
-        hidden_length = sample_rate // n_fft // 2 // 3
-        hidden_channel = n_fft * 2 + 128
+        enc = auto_encoder.EncoderSmall(n_fft)
+        dec = auto_encoder.DecoderSmall(n_fft)
 
+    hidden_length = sample_rate // n_fft // enc.division_factor()
+    hidden_channel = enc.get_hidden_size()
     enc = enc.cuda()
     dec = dec.cuda()
 
@@ -94,8 +90,8 @@ def main() -> None:
     disc_loss_fn = auto_encoder.DiscriminatorLoss().cuda()
     ae_loss_fn = nn.MSELoss(reduction="none").cuda()
 
-    optim_disc = th.optim.Adam(list(enc.parameters()) + list(disc.parameters()), lr=1e-8)
-    optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=1e-5)
+    optim_disc = th.optim.Adam(list(enc.parameters()) + list(disc.parameters()), lr=lr_discriminator)
+    optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=lr_auto_encoder)
 
     batch_size = 4
     nb_batch = ceil(data.size(0) / batch_size)
