@@ -57,17 +57,25 @@ class Coder(nn.Module):
         return 0
 
     @abc.abstractmethod
-    def p(self):
-        pass
+    def _get_str(self):
+        return "Coder"
+
+    def __str__(self):
+        return self._get_str()
+
+    def __repr__(self):
+        return self._get_str()
 
 
 ####################################################
 # Auto Encoder Small - designed for n_fft = 150
 ####################################################
 
-class EncoderSmall(nn.Module):
-    def __init__(self, n_channel):
-        super().__init__()
+class EncoderSmall(Coder):
+    def __init__(self, n_fft: int):
+        super().__init__(n_fft)
+
+        n_channel = n_fft * 2
 
         self.cnn_enc = nn.Sequential(
             nn.Conv1d(n_channel, n_channel + 32,
@@ -90,22 +98,24 @@ class EncoderSmall(nn.Module):
             f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
         return self.cnn_enc(x)
 
-    def __str__(self):
-        return self.__get_str()
-
-    def __repr__(self):
-        return self.__get_str()
-
-    def __get_str(self):
+    def _get_str(self):
         return f"EncoderSmall_{self.n_channel}"
 
+    def get_hidden_size(self) -> int:
+        return self.n_channel + 128
 
-class DecoderSmall(nn.Module):
-    def __init__(self, n_channel):
-        super().__init__()
+    def division_factor(self) -> int:
+        return 2 * 3
+
+
+class DecoderSmall(Coder):
+    def __init__(self, n_fft: int):
+        super().__init__(n_fft)
+
+        n_channel = n_fft * 2
 
         self.cnn_tr_dec = nn.Sequential(
-            nn.ConvTranspose1d(n_channel, n_channel + 64,
+            nn.ConvTranspose1d(n_channel + 128, n_channel + 64,
                                kernel_size=7, stride=3, padding=2),
             nn.BatchNorm1d(n_channel + 64),
             nn.ConvTranspose1d(n_channel + 64, n_channel + 32,
@@ -115,7 +125,7 @@ class DecoderSmall(nn.Module):
                                kernel_size=3, padding=1)
         )
 
-        self.n_channel = n_channel
+        self.n_channel = n_channel + 128
 
     def forward(self, x):
         assert len(x.size()) == 3, \
@@ -124,23 +134,25 @@ class DecoderSmall(nn.Module):
             f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
         return self.cnn_tr_dec(x)
 
-    def __str__(self):
-        return self.__get_str()
-
-    def __repr__(self):
-        return self.__get_str()
-
-    def __get_str(self):
+    def _get_str(self):
         return f"DecoderSmall_{self.n_channel}"
+
+    def get_hidden_size(self) -> int:
+        return self.n_channel
+
+    def division_factor(self) -> int:
+        return 3 * 2
 
 
 ####################################################
 # Auto Encoder 1 - designed for n_fft = 147
 ####################################################
 
-class Encoder1(nn.Module):
-    def __init__(self, n_channel):
-        super().__init__()
+class Encoder1(Coder):
+    def __init__(self, n_fft: int):
+        super().__init__(n_fft)
+
+        n_channel = n_fft * 2
 
         n_layer = 4
 
@@ -172,20 +184,21 @@ class Encoder1(nn.Module):
             f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
         return self.cnn_enc(x)
 
-    def __str__(self):
-        return self.__get_str()
-
-    def __repr__(self):
-        return self.__get_str()
-
-    def __get_str(self):
+    def _get_str(self):
         return f"Encoder1_{self.n_channel}"
 
+    def get_hidden_size(self) -> int:
+        return self.n_channel * 2
 
-class Decoder1(nn.Module):
-    def __init__(self, n_channel):
-        super().__init__()
+    def division_factor(self) -> int:
+        return 3 * 4 * 5
 
+
+class Decoder1(Coder):
+    def __init__(self, n_fft):
+        super().__init__(n_fft)
+
+        n_channel = n_fft * 2
         n_layer = 4
 
         self.cnn_tr_dec = nn.Sequential(
@@ -215,24 +228,25 @@ class Decoder1(nn.Module):
             f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
         return self.cnn_tr_dec(x)
 
-    def __str__(self):
-        return self.__get_str()
-
-    def __repr__(self):
-        return self.__get_str()
-
-    def __get_str(self):
+    def _get_str(self):
         return f"Decoder1_{self.n_channel}"
+
+    def get_hidden_size(self) -> int:
+        return self.n_channel
+
+    def division_factor(self) -> int:
+        return 3 * 4 * 5
 
 
 ####################################################
 # Auto Encoder 2 - designed for n_fft = 147
 ####################################################
 
-class Encoder2(nn.Module):
-    def __init__(self, n_channel: int):
-        super().__init__()
+class Encoder2(Coder):
+    def __init__(self, n_fft: int):
+        super().__init__(n_fft)
 
+        n_channel = n_fft * 2
         n_layer = 5
 
         self.cnn_enc = nn.Sequential(
@@ -266,20 +280,21 @@ class Encoder2(nn.Module):
             f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
         return self.cnn_enc(x)
 
-    def __str__(self):
-        return self.__get_str()
-
-    def __repr__(self):
-        return self.__get_str()
-
-    def __get_str(self):
+    def _get_str(self):
         return f"Encoder2_{self.n_channel}"
 
+    def get_hidden_size(self) -> int:
+        return self.n_channel * 2
 
-class Decoder2(nn.Module):
-    def __init__(self, n_channel: int):
-        super().__init__()
+    def division_factor(self) -> int:
+        return 2 * 2 * 3 * 5
 
+
+class Decoder2(Coder):
+    def __init__(self, n_fft: int):
+        super().__init__(n_fft)
+
+        n_channel = n_fft * 2
         n_layer = 5
 
         self.cnn_tr_dec = nn.Sequential(
@@ -313,38 +328,40 @@ class Decoder2(nn.Module):
             f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
         return self.cnn_tr_dec(x)
 
-    def __str__(self):
-        return self.__get_str()
-
-    def __repr__(self):
-        return self.__get_str()
-
-    def __get_str(self):
+    def _get_str(self):
         return f"Decoder2_{self.n_channel}"
+
+    def get_hidden_size(self) -> int:
+        return self.n_channel
+
+    def division_factor(self) -> int:
+        return 2 * 2 * 3 * 5
 
 
 ####################################################
 # Auto Encoder 2 - designed for n_fft = 147
 ####################################################
 
-class Encoder3(nn.Module):
-    def __init__(self, n_channel: int):
-        super().__init__()
+class Encoder3(Coder):
+    def __init__(self, n_fft: int):
+        super().__init__(n_fft)
 
+        n_channel = n_fft * 2
         n_layer = 4
+
         self.cnn_enc = nn.Sequential(
             nn.Conv1d(n_channel,
                       n_channel + int(n_channel / n_layer),
                       kernel_size=3, padding=1),
-            nn.ReLU(),
+            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
             nn.Conv1d(n_channel + int(n_channel / n_layer),
                       n_channel + int(2 * n_channel / n_layer),
                       kernel_size=5, stride=2, padding=2),
-            nn.ReLU(),
+            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
             nn.Conv1d(n_channel + int(2 * n_channel / n_layer),
                       n_channel + int(3 * n_channel / n_layer),
                       kernel_size=5, stride=2, padding=2),
-            nn.ReLU(),
+            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
             nn.Conv1d(n_channel + int(3 * n_channel / n_layer),
                       n_channel + int(4 * n_channel / n_layer),
                       kernel_size=7, stride=3, padding=3),
@@ -360,31 +377,32 @@ class Encoder3(nn.Module):
             f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
         return self.cnn_enc(x)
 
-    def __str__(self):
-        return self.__get_str()
-
-    def __repr__(self):
-        return self.__get_str()
-
-    def __get_str(self):
+    def _get_str(self):
         return f"Encoder3_{self.n_channel}"
 
+    def get_hidden_size(self) -> int:
+        return self.n_channel * 2
 
-class Decoder3(nn.Module):
-    def __init__(self, n_channel: int):
-        super().__init__()
+    def division_factor(self) -> int:
+        return 2 * 2 * 3
 
+
+class Decoder3(Coder):
+    def __init__(self, n_fft: int):
+        super().__init__(n_fft)
+
+        n_channel = n_fft * 2
         n_layer = 4
 
         self.cnn_tr_dec = nn.Sequential(
             nn.ConvTranspose1d(n_channel + int(4 * n_channel / n_layer),
                                n_channel + int(3 * n_channel / n_layer),
                                kernel_size=7, stride=3, padding=2),
-            nn.ReLU(),
+            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
             nn.ConvTranspose1d(n_channel + int(3 * n_channel / n_layer),
                                n_channel + int(2 * n_channel / n_layer),
                                kernel_size=5, stride=2, padding=2, output_padding=1),
-            nn.ReLU(),
+            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
             nn.ConvTranspose1d(n_channel + int(2 * n_channel / n_layer),
                                n_channel + int(n_channel / n_layer),
                                kernel_size=5, stride=2, padding=2, output_padding=1),
@@ -403,14 +421,14 @@ class Decoder3(nn.Module):
             f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
         return self.cnn_tr_dec(x)
 
-    def __str__(self):
-        return self.__get_str()
-
-    def __repr__(self):
-        return self.__get_str()
-
-    def __get_str(self):
+    def _get_str(self):
         return f"Decoder3_{self.n_channel}"
+
+    def get_hidden_size(self) -> int:
+        return self.n_channel
+
+    def division_factor(self) -> int:
+        return 2 * 2 * 3
 
 
 ####################################################
