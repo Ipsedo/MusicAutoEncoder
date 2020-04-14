@@ -95,14 +95,27 @@ def convert_mp3_to_wav(root_dir: str, out_dir: str, limit: int) -> None:
     cpt = 0
     if not exists(out_dir):
         mkdir(out_dir)
-    for dirname, dirnames, filenames in walk(root_dir):
-        for filename in tqdm(filenames):
+    for dirname, dirnames, filenames in tqdm(walk(root_dir)):
+        for filename in filenames:
             if splitext(filename)[-1] == ".mp3":
                 subprocess.call(["ffmpeg", "-v", "0", "-i", join(dirname, filename),
                                  "-y", "-ar", "44100", join(out_dir, basename(filename) + ".wav")])
                 cpt += 1
                 if cpt >= limit >= 0:
                     return
+
+
+def convert_mp3_to_wav_2(root_dir: str, out_dir: str, limit_per_dir: int = 1):
+    cpt = {}
+    for dirname, dirnames, filenames in tqdm(walk(root_dir)):
+        for filename in filenames:
+            if splitext(filename)[-1] == ".mp3":
+                if dirname not in cpt:
+                    cpt[dirname] = 0
+                if cpt[dirname] < limit_per_dir:
+                    subprocess.call(["ffmpeg", "-v", "0", "-i", join(dirname, filename),
+                                     "-y", "-ar", "44100", join(out_dir, basename(filename) + ".wav")])
+                    cpt[dirname] += 1
 
 
 def ifft_samples(fft_samples: np.ndarray, nfft: int) -> np.ndarray:
@@ -228,7 +241,7 @@ def main() -> None:
         wavfile.write("test.wav", sampling_rate, new_raw_audio.reshape(-1))
 
     elif args.mode == "process":
-        convert_mp3_to_wav(args.audio_root, args.out_dir, args.limit)
+        convert_mp3_to_wav_2(args.audio_root, args.out_dir, args.limit)
     elif args.mode == "save":
         data = __read_wavs_without_copy(args.wav_root, args.nb_wav, args.sample_rate, args.n_fft, args.second)
         th.save(data, args.out_tensor_file)
