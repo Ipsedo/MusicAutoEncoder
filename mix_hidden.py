@@ -14,9 +14,11 @@ import read_audio
 
 
 def main() -> None:
+    coder_maker = auto_encoder.CoderMaker()
+
     parser = argparse.ArgumentParser("Generate Audio main")
 
-    parser.add_argument("--archi", type=str, choices=["small", "1", "2", "3"], dest="archi", required=True)
+    parser.add_argument("--archi", type=str, choices=coder_maker.models, dest="archi", required=True)
     parser.add_argument("--nfft", type=int, dest="n_fft", required=True)
     parser.add_argument("-e", "--encoder-path", type=str, required=True, dest="encoder_path")
     parser.add_argument("-d", "--decoder-path", type=str, required=True, dest="decoder_path")
@@ -48,23 +50,8 @@ def main() -> None:
         datas.append(data)
 
     with th.no_grad():
-        if archi == "1":
-            enc = auto_encoder.Encoder1(n_fft)
-            dec = auto_encoder.Decoder1(n_fft)
-        elif archi == "2":
-            enc = auto_encoder.Encoder2(n_fft)
-            dec = auto_encoder.Decoder2(n_fft)
-        elif archi == "3":
-            enc = auto_encoder.Encoder3(n_fft)
-            dec = auto_encoder.Decoder3(n_fft)
-        elif archi == "small":
-            enc = auto_encoder.EncoderSmall(n_fft)
-            dec = auto_encoder.DecoderSmall(n_fft)
-        else:
-            print(f"Unrecognized NN architecture ({archi}).")
-            print(f"Will load small CNN")
-            enc = auto_encoder.EncoderSmall(n_fft)
-            dec = auto_encoder.DecoderSmall(n_fft)
+        enc = coder_maker["encoder", archi, n_fft]
+        dec = coder_maker["decoder", archi, n_fft]
 
         enc.load_state_dict(th.load(encoder_path))
         dec.load_state_dict(th.load(decoder_path))
@@ -75,6 +62,7 @@ def main() -> None:
 
         if args.mode == "mean":
             hidden = hidden.mean(dim=0)
+
         elif args.mode == "random":
             rand_idx = th.randint(0, hidden.size(0), (hidden.size(1) * hidden.size(3),))
             hidden = hidden.permute(1, 3, 0, 2).flatten(0, 1)
@@ -83,15 +71,21 @@ def main() -> None:
             for i in tqdm(range(res.size(0))):
                 res[i] = hidden[i, rand_idx[i], :]
             hidden = res.permute(1, 0).unsqueeze(0)
+
         elif args.mode == "alternated":
-            idx = th.cat([th.arange(hidden.size(0)) for _ in range(hidden.size(1) * hidden.size(3) // hidden.size(0))])
-            idx = th.cat([idx, th.zeros(hidden.size(0) - idx.size(0)).to(th.long)])
+            size = hidden.size(1) * hidden.size(3)
+
+            idx = th.cat([th.arange(len(input_wavs)) for _ in range(size // len(input_wavs))])
+            idx = th.cat([idx, th.zeros(size - idx.size(0)).to(th.long)])
+
             hidden = hidden.permute(1, 3, 0, 2).flatten(0, 1)
             res = th.zeros(hidden.size(0), hidden.size(2))
 
             for i in tqdm(range(res.size(0))):
                 res[i] = hidden[i, idx[i], :]
+
             hidden = res.permute(1, 0).unsqueeze(0)
+
         else:
             print("Unrecognized mode, will start mean")
             hidden = hidden.mean(dim=0)

@@ -10,9 +10,11 @@ import read_audio
 
 
 def main() -> None:
+    coder_maker = auto_encoder.CoderMaker()
+
     parser = argparse.ArgumentParser("Generate Audio main")
 
-    parser.add_argument("--archi", type=str, choices=["small", "1", "2", "3"], dest="archi", required=True)
+    parser.add_argument("--archi", type=str, choices=coder_maker.models, dest="archi", required=True)
     parser.add_argument("--nfft", type=int, dest="n_fft", required=True)
     parser.add_argument("-e", "--encoder-path", type=str, required=True, dest="encoder_path")
     parser.add_argument("-d", "--decoder-path", type=str, required=True, dest="decoder_path")
@@ -36,23 +38,8 @@ def main() -> None:
     data = th.tensor(np.concatenate([data_real, data_img], axis=2)).to(th.float).permute(0, 2, 1)
 
     with th.no_grad():
-        if archi == "1":
-            enc = auto_encoder.Encoder1(n_fft)
-            dec = auto_encoder.Decoder1(n_fft)
-        elif archi == "2":
-            enc = auto_encoder.Encoder2(n_fft)
-            dec = auto_encoder.Decoder2(n_fft)
-        elif archi == "3":
-            enc = auto_encoder.Encoder3(n_fft)
-            dec = auto_encoder.Decoder3(n_fft)
-        elif archi == "small":
-            enc = auto_encoder.EncoderSmall(n_fft)
-            dec = auto_encoder.DecoderSmall(n_fft)
-        else:
-            print(f"Unrecognized NN architecture ({archi}).")
-            print(f"Will load small CNN")
-            enc = auto_encoder.EncoderSmall(n_fft)
-            dec = auto_encoder.DecoderSmall(n_fft)
+        enc = coder_maker["encoder", archi, n_fft]
+        dec = coder_maker["decoder", archi, n_fft]
 
         enc.load_state_dict(th.load(encoder_path))
         dec.load_state_dict(th.load(decoder_path))

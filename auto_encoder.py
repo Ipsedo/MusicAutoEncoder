@@ -1,4 +1,5 @@
 import abc
+from typing import Tuple
 
 import torch as th
 import torch.nn as nn
@@ -429,6 +430,46 @@ class Decoder3(Coder):
 
     def division_factor(self) -> int:
         return 2 * 2 * 3
+
+
+####################################################
+# Coder maker
+####################################################
+
+class CoderMaker:
+    def __init__(self):
+        self.__coder_types = ["encoder", "decoder"]
+        self.__models = ["small", "1", "2", "3"]
+        self.__model_maker = {
+            "small_encoder": EncoderSmall,
+            "small_decoder": DecoderSmall,
+            "1_encoder": Encoder1,
+            "1_decoder": Decoder1,
+            "2_encoder": Encoder2,
+            "2_decoder": Decoder2,
+            "3_encoder": Encoder3,
+            "3_decoder": Decoder3
+        }
+
+    @property
+    def coder_types(self):
+        return self.__coder_types
+
+    @property
+    def models(self):
+        return self.__models
+
+    def __getitem__(self, coder_model_nfft: Tuple[str, str, int]) -> Coder:
+        coder_type = coder_model_nfft[0]
+        model = coder_model_nfft[1]
+        n_fft = coder_model_nfft[2]
+        assert coder_type in self.__coder_types, \
+            f"Wrong Coder type : {coder_type}, possible = {self.__coder_types}"
+        assert model in self.__models, \
+            f"Wrong Coder model : {model}, possible = {self.__models}"
+        assert n_fft > 0, f"Wrong FFT value : {n_fft}, must be > 0."
+
+        return self.__model_maker[model + "_" + coder_type](n_fft)
 
 
 ####################################################

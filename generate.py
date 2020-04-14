@@ -12,9 +12,11 @@ import hidden_repr
 
 
 def main() -> None:
+    coder_maker = auto_encoder.CoderMaker()
+
     parser = argparse.ArgumentParser("Generate Audio main")
 
-    parser.add_argument("--archi", type=str, choices=["small", "1", "2", "3"], dest="archi", required=True)
+    parser.add_argument("--archi", type=str, choices=coder_maker.models, dest="archi", required=True)
     parser.add_argument("--nfft", type=int, dest="n_fft", required=True)
     parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
     parser.add_argument("-m", "--model-path", type=str, required=True, dest="model_path")
@@ -40,18 +42,7 @@ def main() -> None:
     with th.no_grad():
         print(f"Loading model \"{model_path}\"")
 
-        if archi == "1":
-            dec = auto_encoder.Decoder1(n_fft)
-        elif archi == "2":
-            dec = auto_encoder.Decoder2(n_fft)
-        elif archi == "3":
-            dec = auto_encoder.Decoder3(n_fft)
-        elif archi == "small":
-            dec = auto_encoder.DecoderSmall(n_fft)
-        else:
-            print(f"Unrecognized NN architecture ({archi}).")
-            print(f"Will load small CNN")
-            dec = auto_encoder.DecoderSmall(n_fft)
+        dec = coder_maker["decoder", archi, n_fft]
 
         hidden_length = sample_rate // n_fft // dec.division_factor()
         hidden_channel = dec.get_hidden_size()
