@@ -14,7 +14,7 @@ import hidden_repr
 def main() -> None:
     parser = argparse.ArgumentParser("Generate Audio main")
 
-    parser.add_argument("--archi", type=str, choices=["small", "1", "2"], dest="archi", required=True)
+    parser.add_argument("--archi", type=str, choices=["small", "1", "2", "3"], dest="archi", required=True)
     parser.add_argument("--n-fft", type=int, dest="n_fft", required=True)
     parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
     parser.add_argument("-m", "--model-path", type=str, required=True, dest="model_path")
@@ -48,6 +48,10 @@ def main() -> None:
             dec = auto_encoder.Decoder2(n_fft * 2)
             hidden_length = sample_rate // n_fft // 2 // 2 // 3 // 5
             hidden_channel = n_fft * 2 * 2
+        elif archi == "3":
+            dec = auto_encoder.Decoder3(n_fft * 2)
+            hidden_length = sample_rate // n_fft // 2 // 2 // 3
+            hidden_channel = n_fft * 2 * 2
         elif archi == "small":
             dec = auto_encoder.DecoderSmall(n_fft * 2)
             hidden_length = sample_rate // n_fft // 2 // 3
@@ -71,10 +75,9 @@ def main() -> None:
         cov_mat = th.mm(cov_mat, cov_mat.transpose(1, 0))
         means = th.rand(hidden_channel) * 0.6 - 0.3
 
-        random_data = hidden_repr.rec_multivariate_gen(hidden_length, nb_sec, hidden_channel, means, cov_mat,
-                                                       eta=1 - 1e-3)
+        #random_data = hidden_repr.rec_multivariate_gen(hidden_length, nb_sec, hidden_channel, means, cov_mat, eta=1 - 1e-3)
 
-        # random_data = hidden_repr.rec_multivariate_different_gen(values.HIDDEN_LENGTH, nb_sec, hidden_channel, eta=0.7, beta=0.7)
+        random_data = hidden_repr.rec_multivariate_different_gen(hidden_length, nb_sec, hidden_channel, eta=0.7, beta=0.7)
 
         print("Passing random data to decoder")
         out = dec(random_data)
