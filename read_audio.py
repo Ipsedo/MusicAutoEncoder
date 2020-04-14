@@ -105,7 +105,7 @@ def convert_mp3_to_wav(root_dir: str, out_dir: str, limit: int) -> None:
                     return
 
 
-def convert_mp3_to_wav_2(root_dir: str, out_dir: str, limit_per_dir: int = 1):
+def convert_mp3_to_wav_2(root_dir: str, out_dir: str, limit_per_dir: int = 1) -> None:
     cpt = {}
     for dirname, dirnames, filenames in tqdm(walk(root_dir)):
         for filename in filenames:
@@ -115,6 +115,18 @@ def convert_mp3_to_wav_2(root_dir: str, out_dir: str, limit_per_dir: int = 1):
                 if cpt[dirname] < limit_per_dir:
                     subprocess.call(["ffmpeg", "-v", "0", "-i", join(dirname, filename),
                                      "-y", "-ar", "44100", join(out_dir, basename(filename) + ".wav")])
+                    cpt[dirname] += 1
+
+
+def copy_mp3_2(root_dir: str, out_dir: str, limit_per_dir: int = 1) -> None:
+    cpt = {}
+    for dirname, dirnames, filenames in tqdm(walk(root_dir)):
+        for filename in filenames:
+            if splitext(filename)[-1] == ".mp3":
+                if dirname not in cpt:
+                    cpt[dirname] = 0
+                if cpt[dirname] < limit_per_dir:
+                    subprocess.call(["cp", join(dirname, filename), out_dir])
                     cpt[dirname] += 1
 
 
