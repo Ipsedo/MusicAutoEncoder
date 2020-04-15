@@ -45,7 +45,18 @@ def gen_random_cov_mat(nb_channel: int, extreme_value: float) -> th.Tensor:
     return cov_mat
 
 
-def rec_multivariate_different_gen(hidden_size: int, nb_sec: int, nb_channel: int, eta: float = 0.1, beta: float = 0.2) -> th.Tensor:
+def gen_init_normal_uni_add(hidden_size: int, nb_sec: int, nb_channel: int) -> th.Tensor:
+    res = th.zeros(nb_sec * hidden_size, nb_channel)
+    res[0] = th.randn(nb_channel) * th.randint(0, 2, (nb_channel,), dtype=th.float)
+
+    for i in range(1, nb_sec * hidden_size):
+        res[i] = res[i - 1] + th.rand(nb_channel) * 2e-2 - 1e-2
+
+    return res.permute(1, 0).unsqueeze(0)
+
+
+def rec_multivariate_different_gen(hidden_size: int, nb_sec: int, nb_channel: int,
+                                   eta: float = 0.1, beta: float = 0.2) -> th.Tensor:
     means = gen_random_means(nb_channel, -0.3, 0.3)
     cov_mat = gen_random_cov_mat(nb_channel, 20.)
     dist = MultivariateNormal(means, cov_mat)
