@@ -54,7 +54,7 @@ def main() -> None:
 
         data[i, :, :], data[j, :, :] = data[j, :, :], data[i, :, :]
 
-    data = data[:18000]
+    # data = data[:18000]
 
     print(data.size())
 
