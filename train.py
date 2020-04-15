@@ -65,17 +65,17 @@ def main() -> None:
 
     hidden_length = sample_rate // n_fft // enc.division_factor()
     hidden_channel = enc.get_hidden_size()
-    enc = enc.cuda()
-    dec = dec.cuda()
+    enc = enc.cuda(0)
+    dec = dec.cuda(0)
 
     hidden_length = seconds * hidden_length
 
-    disc = auto_encoder.Discriminator(hidden_channel).cuda()
+    disc = auto_encoder.Discriminator(hidden_channel).cuda(0)
 
     print(f"Hidden layer size : {hidden_length}")
 
-    disc_loss_fn = auto_encoder.DiscriminatorLoss().cuda()
-    ae_loss_fn = nn.MSELoss(reduction="none").cuda()
+    disc_loss_fn = auto_encoder.DiscriminatorLoss().cuda(0)
+    ae_loss_fn = nn.MSELoss(reduction="none").cuda(0)
 
     optim_disc = th.optim.Adam(list(enc.parameters()) + list(disc.parameters()), lr=lr_discriminator)
     optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=lr_auto_encoder)
