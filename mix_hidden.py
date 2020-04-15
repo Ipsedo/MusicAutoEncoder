@@ -3,8 +3,6 @@ import argparse
 import torch as th
 import numpy as np
 
-from typing import List
-
 from tqdm import tqdm
 
 from scipy.io import wavfile

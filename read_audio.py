@@ -1,6 +1,6 @@
 import argparse
 from os import walk, mkdir, listdir
-from os.path import splitext, isfile, isdir, basename, join, exists
+from os.path import splitext, basename, join, exists
 import subprocess
 
 import torch as th
