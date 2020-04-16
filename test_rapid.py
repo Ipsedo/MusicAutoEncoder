@@ -2,37 +2,72 @@ import torch as th
 import torch. nn as nn
 import auto_encoder
 
-n_channel = 147 * 2
-x = th.rand(2, n_channel, 44100 // 147)
+n_fft = 175
+n_channel = n_fft * 2
+x = th.rand(2, n_channel, 1*44100 // n_fft)
+
+n_layer = 5
+
+o=auto_encoder.Encoder4(n_fft)(x)
+y=auto_encoder.Decoder4(n_fft)(o)
+print(x.size())
+print(o.size())
+print(y.size())
+exit()
+#
+
+enc1=nn.Conv1d(n_channel, n_channel + int(n_channel / n_layer),
+                      kernel_size=3, padding=1)
+enc2=nn.Conv1d(n_channel + int(n_channel / n_layer),
+                      n_channel + int(2 * n_channel / n_layer),
+                      kernel_size=5, stride=2, padding=2)
+enc3=nn.Conv1d(n_channel + int(2 * n_channel / n_layer),
+                      n_channel + int(3 * n_channel / n_layer),
+                      kernel_size=5, stride=2, padding=2)
+enc4=nn.Conv1d(n_channel + int(3 * n_channel / n_layer),
+                      n_channel + int(4 * n_channel / n_layer),
+                      kernel_size=7, stride=3, padding=3)
+enc5=nn.Conv1d(n_channel + int(4 * n_channel / n_layer),
+                      n_channel + int(5 * n_channel / n_layer),
+                      kernel_size=7, stride=3, padding=3)
 
 n_layer = 4
+dec1=nn.ConvTranspose1d(n_channel * 2,
+                               n_channel + int(4 * n_channel / n_layer),
+                               kernel_size=7, stride=3, padding=2)
+dec2=nn.ConvTranspose1d(n_channel + int(4 * n_channel / n_layer),
+                               n_channel + int(3 * n_channel / n_layer),
+                               kernel_size=7, stride=3, padding=2)
+dec3=nn.ConvTranspose1d(n_channel + int(3 * n_channel / n_layer),
+                               n_channel + int(2 * n_channel / n_layer),
+                               kernel_size=5, stride=2, padding=2, output_padding=1)
+dec4=nn.ConvTranspose1d(n_channel + int(2* n_channel / n_layer),
+                               n_channel+int(n_channel / n_layer),
+                               kernel_size=5, stride=2, padding=2, output_padding=1)
+dec5=nn.ConvTranspose1d(n_channel + int(n_channel / n_layer),
+                               n_channel,
+                               kernel_size=3, padding=1)
+e1=enc1(x)
+print(e1.size())
+e2=enc2(e1)
+print(e2.size())
+e3=enc3(e2)
+print(e3.size())
+e4=enc4(e3)
+print(e4.size())
+e5=enc5(e4)
+print(e5.size())
 
-ec1 = nn.Conv1d(n_channel, n_channel + int(n_channel / n_layer),
-                kernel_size=3, padding=1)
-ec2 = nn.Conv1d(n_channel + int(n_channel / n_layer), n_channel + int(2 * n_channel / n_layer),
-                kernel_size=5, stride=2, padding=2)
-ec3 = nn.Conv1d(n_channel + int(2 * n_channel / n_layer), n_channel + int(3 * n_channel / n_layer),
-                kernel_size=5, stride=2, padding=2)
-ec4 = nn.Conv1d(n_channel + int(3 * n_channel / n_layer), n_channel + int(4 * n_channel / n_layer),
-                kernel_size=7, stride=3, padding=3)
-
-print(x.size(), ec1(x).size(), ec2(ec1(x)).size(), ec3(ec2(ec1(x))).size(), ec4(ec3(ec2(ec1(x)))).size())
-
-dc1=nn.ConvTranspose1d(n_channel + int(4 * n_channel / n_layer),
-                       n_channel + int(3 * n_channel / n_layer),
-                       kernel_size=7, stride=3, padding=2)
-dc2=nn.ConvTranspose1d(n_channel + int(3 * n_channel / n_layer),
-                       n_channel + int(2 * n_channel / n_layer),
-                       kernel_size=5, stride=2, padding=2, output_padding=1)
-dc3=nn.ConvTranspose1d(n_channel + int(2 * n_channel / n_layer),
-                       n_channel + int(n_channel / n_layer),
-                       kernel_size=5, stride=2, padding=2, output_padding=1)
-dc4=nn.ConvTranspose1d(n_channel + int(n_channel / n_layer),
-                       n_channel,
-                       kernel_size=3, padding=1)
-out = th.rand(2, 588, 25)
-print(dc1(out).size(), dc2(dc1(out)).size(), dc3(dc2(dc1(out))).size(), dc4(dc3(dc2(dc1(out)))).size())
-
+o1=dec1(e5)
+print(o1.size())
+o2=dec2(o1)
+print(o2.size())
+o3=dec3(o2)
+print(o3.size())
+o4=dec4(o3)
+print(o4.size())
+o5=dec5(o4)
+print(o5.size())
 # enc = auto_encoder.Encoder2(n_channel)
 # dec = auto_encoder.Decoder2(n_channel)
 # out = enc(x)
