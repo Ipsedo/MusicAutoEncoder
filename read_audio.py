@@ -182,6 +182,7 @@ def main() -> None:
     parser = argparse.ArgumentParser("Read audio main")
 
     subparser = parser.add_subparsers(dest="mode")
+    subparser.required = True
 
     test_parser = subparser.add_parser("test")
     test_parser.add_argument("-i", "--input-audio", type=str, required=True, dest="input_audio")
