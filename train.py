@@ -54,7 +54,7 @@ def main() -> None:
 
         data[i, :, :], data[j, :, :] = data[j, :, :], data[i, :, :]
 
-    data = data[:int(data.shape[0] / 6)]
+    #data = data[:int(data.shape[0] / 60)]
 
     print(data.size())
 
