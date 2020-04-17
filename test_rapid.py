@@ -2,14 +2,15 @@ import torch as th
 import torch. nn as nn
 import auto_encoder
 
-n_fft = 175
+n_fft = 49
 n_channel = n_fft * 2
 x = th.rand(2, n_channel, 1*44100 // n_fft)
 
 n_layer = 5
 
-o=auto_encoder.Encoder4(n_fft)(x)
-y=auto_encoder.Decoder4(n_fft)(o)
+o=auto_encoder.Encoder4Bis(n_fft)(x)
+y=auto_encoder.Decoder4Bis(n_fft)(o)
+print(auto_encoder.Encoder4Bis(n_fft).get_hidden_size())
 print(x.size())
 print(o.size())
 print(y.size())
