@@ -58,10 +58,12 @@ def main() -> None:
         cov_mat = th.mm(cov_mat, cov_mat.transpose(1, 0))
         means = th.rand(hidden_channel) * 0.6 - 0.3
 
-        #random_data = hidden_repr.rec_multivariate_gen(hidden_length, nb_sec, hidden_channel, means, cov_mat, eta=1 - 1e-3)
+        #random_data = hidden_repr.rec_multivariate_gen(hidden_length, nb_sec, hidden_channel, means, cov_mat, eta=0.5)
 
-        #random_data = hidden_repr.rec_multivariate_different_gen(hidden_length, nb_sec, hidden_channel, eta=0.7, beta=0.7)
-        random_data = hidden_repr.gen_init_normal_uni_add(hidden_length, nb_sec, hidden_channel)
+        #random_data = hidden_repr.rec_multivariate_different_gen(hidden_length, nb_sec, hidden_channel, eta=0.9, beta=0.1)
+        #random_data = hidden_repr.gen_init_normal_uni_add(hidden_length, nb_sec, hidden_channel)
+
+        random_data = th.randn(1, hidden_channel, hidden_length * nb_sec)
 
         print("Passing random data to decoder")
         out = dec(random_data)
