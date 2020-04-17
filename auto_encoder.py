@@ -1,5 +1,5 @@
 import abc
-from typing import Tuple, Any
+from typing import Tuple
 
 import torch as th
 import torch.nn as nn
