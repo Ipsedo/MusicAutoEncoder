@@ -199,7 +199,7 @@ def main() -> None:
     save_parser.add_argument("-o", "--out-tensor-file", type=str, dest="out_tensor_file", required=True)
     save_parser.add_argument("--nfft", type=int, dest="n_fft", required=True)
     save_parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
-    save_parser.add_argument("-s", "--second", type=int, required=True, dest="second")
+    save_parser.add_argument("-s", "--seconds", type=int, required=True, dest="seconds")
 
     args = parser.parse_args()
 
@@ -256,7 +256,7 @@ def main() -> None:
     elif args.mode == "process":
         convert_mp3_to_wav_2(args.audio_root, args.out_dir, args.limit)
     elif args.mode == "save":
-        data = __read_wavs_without_copy(args.wav_root, args.nb_wav, args.sample_rate, args.n_fft, args.second)
+        data = __read_wavs_without_copy(args.wav_root, args.nb_wav, args.sample_rate, args.n_fft, args.seconds)
         th.save(data, args.out_tensor_file)
 
 
