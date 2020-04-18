@@ -60,7 +60,6 @@ def main() -> None:
         print(cplx_out.shape)
 
         raw_audio = read_audio.ifft_samples(cplx_out, n_fft)
-        raw_audio = raw_audio# / np.linalg.norm(raw_audio)
         print(raw_audio.shape)
 
         wavfile.write("inference.wav", 44100, raw_audio.reshape(-1))
