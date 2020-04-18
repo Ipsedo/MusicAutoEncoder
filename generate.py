@@ -8,7 +8,7 @@ from scipy.io import wavfile
 
 import auto_encoder
 import read_audio
-import hidden_repr
+from generator import normal_dist
 
 
 def main() -> None:
@@ -52,7 +52,7 @@ def main() -> None:
         # random_data = hidden_repr.rec_multivariate_gen_2(nb_sec, hidden_channel)
         # random_data = th.tensor(random_data).to(th.float).unsqueeze(0)
 
-        # random_data = hidden_repr.rec_normal_gen(values.HIDDEN_LENGTH, nb_sec, hidden_channel, eta=1e-2)
+        random_data = normal_dist.rec_normal_gen(hidden_length, nb_sec, hidden_channel, eta=0.9)
 
         cov_mat = th.rand(hidden_channel, hidden_channel) * 8. - 4.
         cov_mat = th.mm(cov_mat, cov_mat.transpose(1, 0))
@@ -63,7 +63,7 @@ def main() -> None:
         #random_data = hidden_repr.rec_multivariate_different_gen(hidden_length, nb_sec, hidden_channel, eta=0.9, beta=0.1)
         #random_data = hidden_repr.gen_init_normal_uni_add(hidden_length, nb_sec, hidden_channel)
 
-        random_data = th.randn(1, hidden_channel, hidden_length * nb_sec)
+        #random_data = th.randn(1, hidden_channel, hidden_length * nb_sec)
 
         print("Passing random data to decoder")
         out = dec(random_data)
