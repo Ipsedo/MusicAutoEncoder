@@ -697,16 +697,19 @@ class Discriminator(nn.Module):
         return f"Discriminator_{self.n_channel}"
 
 
-class DiscriminatorLoss(nn.Module):
-    def __init__(self):
-        super().__init__()
+def discriminator_loss(d_z_prime, d_z):
+    assert len(d_z_prime.size()) == 1, \
+        f"Wrong z_prime size, actual : {d_z_prime.size()}, needed : (N)."
+    assert len(d_z.size()) == 1, \
+        f"Wrong z size, actual : {d_z.size()}, needed : (N)."
+    assert d_z_prime.size(0) == d_z.size(0), \
+        f"z_prime en z must have the same batch size, z_fake : {d_z_prime.size(0)} and z_real : {d_z.size(0)}"
 
-    def forward(self, d_z_prime, d_z):
-        assert len(d_z_prime.size()) == 1, \
-            f"Wrong z_prime size, actual : {d_z_prime.size()}, needed : (N)."
-        assert len(d_z.size()) == 1, \
-            f"Wrong z size, actual : {d_z.size()}, needed : (N)."
-        assert d_z_prime.size(0) == d_z.size(0), \
-            f"z_prime en z must have the same batch size, z_fake : {d_z_prime.size(0)} and z_real : {d_z.size(0)}"
+    return -th.mean(th.log2(d_z_prime) + th.log2(1. - d_z), dim=0)
 
-        return th.mean(th.log2(d_z_prime) + th.log2(1. - d_z), dim=0)
+
+def generator_loss(d_z):
+    assert len(d_z.size()) == 1, \
+        f"Wrong z size, actual : {d_z.size()}, needed : (N)."
+
+    return -th.mean(th.log2(d_z), dim=0)
