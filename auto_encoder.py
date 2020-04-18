@@ -619,13 +619,113 @@ class Decoder4Bis(Coder):
 
 
 ####################################################
+# Auto Encoder 2 Bis - designed for n_fft = 49
+####################################################
+
+class Encoder2Bis(Coder):
+    def __init__(self, n_fft: int):
+        super().__init__(n_fft)
+
+        n_channel = n_fft * 2
+        n_layer = 5
+
+        self.cnn_enc = nn.Sequential(
+            nn.Conv1d(n_channel, int(n_channel * 1.5 ** 1),
+                      kernel_size=3, padding=1),
+            nn.BatchNorm1d(int(n_channel * 1.5 ** 1)),
+            nn.Conv1d(int(n_channel * 1.5 ** 1),
+                      int(n_channel * 1.5 ** 2),
+                      kernel_size=5, stride=2, padding=2),
+            nn.BatchNorm1d(int(n_channel * 1.5 ** 2)),
+            nn.Conv1d(int(n_channel * 1.5 ** 2),
+                      int(n_channel * 1.5 ** 3),
+                      kernel_size=5, stride=2, padding=2),
+            nn.BatchNorm1d(int(n_channel * 1.5 ** 3)),
+            nn.Conv1d(int(n_channel * 1.5 ** 3),
+                      int(n_channel * 1.5 ** 4),
+                      kernel_size=7, stride=3, padding=2),
+            nn.BatchNorm1d(int(n_channel * 1.5 ** 4)),
+            nn.Conv1d(int(n_channel * 1.5 ** 4),
+                      int(n_channel * 1.5 ** 5),
+                      kernel_size=11, stride=5, padding=5),
+            nn.BatchNorm1d(n_channel + int(5 * n_channel / n_layer))
+        )
+
+        self.n_channel = n_channel
+
+    def forward(self, x):
+        assert len(x.size()) == 3, \
+            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
+        assert x.size(1) == self.n_channel, \
+            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+        return self.cnn_enc(x)
+
+    def _get_str(self):
+        return f"Encoder2Bis_{self.n_channel}"
+
+    def get_hidden_size(self) -> int:
+        return int(self.n_channel * 1.5 ** 5)
+
+    def division_factor(self) -> int:
+        return 2 * 2 * 3 * 5
+
+
+class Decoder2Bis(Coder):
+    def __init__(self, n_fft: int):
+        super().__init__(n_fft)
+
+        n_channel = n_fft * 2
+        n_layer = 5
+
+        self.cnn_tr_dec = nn.Sequential(
+            nn.ConvTranspose1d(int(n_channel * 1.5 ** 5),
+                               int(n_channel * 1.5 ** 4),
+                               kernel_size=11, stride=5, padding=3),
+            nn.BatchNorm1d(int(n_channel * 1.5 ** 4)),
+            nn.ConvTranspose1d(int(n_channel * 1.5 ** 4),
+                               int(n_channel * 1.5 ** 3),
+                               kernel_size=7, stride=3, padding=2),
+            nn.BatchNorm1d(int(n_channel * 1.5 ** 3)),
+            nn.ConvTranspose1d(int(n_channel * 1.5 ** 3),
+                               int(n_channel * 1.5 ** 2),
+                               kernel_size=5, stride=2, padding=2, output_padding=1),
+            nn.BatchNorm1d(int(n_channel * 1.5 ** 2)),
+            nn.ConvTranspose1d(int(n_channel * 1.5 ** 2),
+                               int(n_channel * 1.5 ** 1),
+                               kernel_size=5, stride=2, padding=2, output_padding=1),
+            nn.BatchNorm1d(int(n_channel * 1.5 ** 1)),
+            nn.ConvTranspose1d(int(n_channel * 1.5 ** 1),
+                               n_channel,
+                               kernel_size=3, padding=1)
+        )
+
+        self.n_channel = int(n_channel * 1.5 ** 5)
+
+    def forward(self, x):
+        assert len(x.size()) == 3, \
+            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
+        assert x.size(1) == self.n_channel, \
+            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+        return self.cnn_tr_dec(x)
+
+    def _get_str(self):
+        return f"Decoder2Bis_{self.n_channel}"
+
+    def get_hidden_size(self) -> int:
+        return self.n_channel
+
+    def division_factor(self) -> int:
+        return 2 * 2 * 3 * 5
+
+
+####################################################
 # Coder maker
 ####################################################
 
 class CoderMaker:
     def __init__(self):
         self.__coder_types = ["encoder", "decoder"]
-        self.__models = ["small", "1", "2", "3", "4", "4bis"]
+        self.__models = ["small", "1", "2", "3", "4", "4bis", "2bis"]
         self.__model_maker = {
             "small_encoder": EncoderSmall,
             "small_decoder": DecoderSmall,
@@ -638,7 +738,9 @@ class CoderMaker:
             "4_encoder": Encoder4,
             "4_decoder": Decoder4,
             "4bis_encoder": Encoder4Bis,
-            "4bis_decoder": Decoder4Bis
+            "4bis_decoder": Decoder4Bis,
+            "2bis_encoder": Encoder2Bis,
+            "2bis_decoder": Decoder2Bis
         }
 
     @property
