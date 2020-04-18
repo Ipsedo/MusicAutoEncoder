@@ -19,34 +19,34 @@ def main() -> None:
     parser.add_argument("--archi", type=str, choices=coder_maker.models, dest="archi", required=True)
     parser.add_argument("--nfft", type=int, dest="n_fft", required=True)
     parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
-    parser.add_argument("-m", "--model-path", type=str, required=True, dest="model_path")
+    parser.add_argument("-d", "--decoder-path", type=str, required=True, dest="decoder_path")
     parser.add_argument("-n", "--nb-sec", type=int, default=1, dest="nb_sec")
     parser.add_argument("-o", "--out-wav", type=str, default="generated_audio.wav", dest="out_wav")
 
     args = parser.parse_args()
 
-    model_path = args.model_path
+    decoder_path = args.decoder_path
     nb_sec = args.nb_sec
     out_wav = args.out_wav
     archi = args.archi
     n_fft = args.n_fft
     sample_rate = args.sample_rate
 
-    if not exists(model_path):
-        print(f"{model_path} doesn't exist !")
+    if not exists(decoder_path):
+        print(f"{decoder_path} doesn't exist !")
         exit()
-    if not isfile(model_path):
-        print(f"{model_path} isn't a file !")
+    if not isfile(decoder_path):
+        print(f"{decoder_path} isn't a file !")
         exit()
 
     with th.no_grad():
-        print(f"Loading model \"{model_path}\"")
+        print(f"Loading model \"{decoder_path}\"")
 
         dec = coder_maker["decoder", archi, n_fft]
 
         hidden_length = sample_rate // n_fft // dec.division_factor()
         hidden_channel = dec.get_hidden_size()
-        dec.load_state_dict(th.load(model_path))
+        dec.load_state_dict(th.load(decoder_path))
 
         print("Random hidden representation generation")
         # random_data = hidden_repr.rec_multivariate_gen_2(nb_sec, hidden_channel)
