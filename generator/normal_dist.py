@@ -2,12 +2,22 @@ import torch as th
 from torch.distributions.multivariate_normal import MultivariateNormal
 
 
-def rec_normal_gen(hidden_size: int, nb_sec: int, nb_channel: int, eta: float = 0.8) -> th.Tensor:
+def rec_normal_gen_mask(hidden_size: int, nb_sec: int, nb_channel: int, eta: float = 0.8) -> th.Tensor:
     res = th.zeros(nb_sec * hidden_size, nb_channel)
     res[0] = th.randn(nb_channel) * th.randint(0, 2, (nb_channel,), dtype=th.float)
 
     for i in range(1, nb_sec * hidden_size):
         res[i] = eta * res[i - 1] + (1. - eta) * th.randn(nb_channel) * th.randint(0, 2, (nb_channel,), dtype=th.float)
+
+    return res.permute(1, 0).unsqueeze(0)
+
+
+def rec_normal_gen(hidden_size: int, nb_sec: int, nb_channel: int, eta: float = 0.8) -> th.Tensor:
+    res = th.zeros(nb_sec * hidden_size, nb_channel)
+    res[0] = th.randn(nb_channel)
+
+    for i in range(1, nb_sec * hidden_size):
+        res[i] = eta * res[i - 1] + (1. - eta) * th.randn(nb_channel)
 
     return res.permute(1, 0).unsqueeze(0)
 
