@@ -24,8 +24,8 @@ def main() -> None:
     parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
     parser.add_argument("--seconds", type=int, required=True, dest="seconds")
     parser.add_argument("--tensor-file", type=str, required=True, dest="tensor_file")
-    parser.add_argument("--lr-ae", type=float, default=1e-6, dest="lr_auto_encoder")
-    parser.add_argument("--lr-disc", type=float, default=1e-9, dest="lr_discriminator")
+    parser.add_argument("--lr-ae", type=float, default=6e-5, dest="lr_auto_encoder")
+    parser.add_argument("--lr-disc", type=float, default=8e-5, dest="lr_discriminator")
     parser.add_argument("--out-model-dir", type=str, required=True, dest="out_dir")
 
     args = parser.parse_args()
@@ -54,8 +54,6 @@ def main() -> None:
 
         data[i, :, :], data[j, :, :] = data[j, :, :], data[i, :, :]
 
-    #data = data[:int(data.shape[0] / 60)]
-
     print(data.size())
 
     print("Creating pytorch stuff...")
@@ -63,35 +61,35 @@ def main() -> None:
     enc = coder_maker["encoder", archi, n_fft]
     dec = coder_maker["decoder", archi, n_fft]
 
-    hidden_length = sample_rate // n_fft // enc.division_factor()
+    hidden_length = seconds * sample_rate // n_fft // enc.division_factor()
     hidden_channel = enc.get_hidden_size()
     enc = enc.cuda(0)
     dec = dec.cuda(0)
-
-    hidden_length = seconds * hidden_length
 
     disc = auto_encoder.Discriminator(hidden_channel).cuda(0)
 
     print(f"Hidden layer size : {hidden_length}")
 
-    disc_loss_fn = auto_encoder.DiscriminatorLoss().cuda(0)
     ae_loss_fn = nn.MSELoss(reduction="none").cuda(0)
 
-    optim_disc = th.optim.Adam(list(enc.parameters()) + list(disc.parameters()), lr=lr_discriminator)
     optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=lr_auto_encoder)
+    optim_disc = th.optim.Adam(disc.parameters(), lr=lr_discriminator)
+    optim_gen = th.optim.Adam(enc.parameters(), lr=lr_discriminator)
 
     batch_size = 4
     nb_batch = ceil(data.size(0) / batch_size)
 
-    nb_epoch = 10
+    nb_epoch = 15
 
     print("Start learning...")
     for e in range(nb_epoch):
         sum_loss_ae = 0
         sum_loss_disc = 0
+        sum_loss_gen = 0
 
         nb_backward_ae = 0
         nb_backward_disc = 0
+        nb_backward_gen = 0
 
         enc.train()
         dec.train()
@@ -105,11 +103,11 @@ def main() -> None:
 
             x_batch = data[i_min:i_max].cuda()
 
+            # Auto Encoder
+            enc.train()
+            dec.train()
+
             out_enc = enc(x_batch)
-
-            z = out_enc.permute(0, 2, 1).flatten(0, 1)
-            z_prime = th.randn(*z.size(), device=th.device("cuda"), dtype=th.float)
-
             out_dec = dec(out_enc)
 
             loss_autoencoder = ae_loss_fn(out_dec, x_batch).mean(dim=1).view(-1)
@@ -131,7 +129,15 @@ def main() -> None:
                 nb_backward_ae += 1
                 sum_loss_ae += loss_ae.item()
 
-            batch_size_disc = 8
+            # Discriminator
+            enc.eval()
+            disc.train()
+
+            out_enc = enc(x_batch)
+            z = out_enc.permute(0, 2, 1).flatten(0, 1)
+            z_prime = th.randn(*z.size(), device=th.device("cuda"), dtype=th.float)
+
+            batch_size_disc = 4
             nb_batch_disc = ceil(z.size(0) / batch_size_disc)
 
             for b_idx_disc in range(nb_batch_disc):
@@ -145,7 +151,7 @@ def main() -> None:
                 d_z = disc(b_z)
                 d_z_prime = disc(b_z_prime)
 
-                loss_disc = disc_loss_fn(d_z_prime, d_z)
+                loss_disc = auto_encoder.discriminator_loss(d_z_prime, d_z)
 
                 optim_disc.zero_grad()
                 loss_disc.backward(retain_graph=True)
@@ -154,18 +160,45 @@ def main() -> None:
                 sum_loss_disc += loss_disc.item()
                 nb_backward_disc += 1
 
+            # Generator
+            enc.train()
+            disc.eval()
+
+            out_enc = enc(x_batch)
+            z = out_enc.permute(0, 2, 1).flatten(0, 1)
+
+            batch_size_gen = 4
+            nb_batch_gen = ceil(z.size(0) / batch_size_gen)
+
+            for b_idx_gen in range(nb_batch_gen):
+                i_min_gen = b_idx_gen * batch_size_gen
+                i_max_gen = (b_idx_gen + 1) * batch_size_gen
+                i_max_gen = i_max_gen if i_max_gen < z.size(0) else z.size(0)
+
+                b_z = z[i_min_gen:i_max_gen]
+                d_z = disc(b_z)
+
+                loss_gen = auto_encoder.generator_loss(d_z)
+                optim_gen.zero_grad()
+                loss_gen.backward(retain_graph=True)
+                optim_gen.step()
+
+                sum_loss_gen += loss_gen.item()
+                nb_backward_gen += 1
+
             tqdm_pbar.set_description(f"Epoch {e:2d} : "
-                                      f"loss_ae_avg = {sum_loss_ae / nb_backward_ae:.6f}, "
-                                      f"loss_disc_avg = {sum_loss_disc / nb_backward_disc:.6f} ")
+                                      f"ae_avg = {sum_loss_ae / nb_backward_ae:.6f}, "
+                                      f"disc_avg = {sum_loss_disc / nb_backward_disc:.6f}, "
+                                      f"gen_avg = {sum_loss_gen / nb_backward_gen:.6f}")
 
         th.save(enc.state_dict(), join(out_dir, f"{enc}_epoch-{e}.th"))
         th.save(dec.state_dict(), join(out_dir, f"{dec}_epoch-{e}.th"))
         th.save(optim_ae.state_dict(), join(out_dir, f"optim_ae_epoch-{e}.th"))
         th.save(ae_loss_fn.state_dict(), join(out_dir, f"loss_ae_fn_epoch-{e}.th"))
+        th.save(optim_gen.state_dict(), join(out_dir, f"optim_gen_epoch-{e}.th"))
 
         th.save(disc.state_dict(), join(out_dir, f"{disc}_epoch-{e}.th"))
         th.save(optim_disc.state_dict(), join(out_dir, f"optim_disc_epoch-{e}.th"))
-        th.save(disc_loss_fn.state_dict(), join(out_dir, f"loss_disc_fn_epoch-{e}.th"))
 
 
 if __name__ == "__main__":
