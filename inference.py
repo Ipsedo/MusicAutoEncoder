@@ -59,8 +59,9 @@ def main() -> None:
 
         print(cplx_out.shape)
 
-        raw_audio = read_audio.ifft_samples(cplx_out, n_fft)
+        raw_audio = read_audio.ifft_samples(cplx_out, n_fft).astype(np.float32)
         print(raw_audio.shape)
+        print(raw_audio.dtype, raw_audio.min(), raw_audio.max())
 
         wavfile.write("inference.wav", 44100, raw_audio.reshape(-1))
 
