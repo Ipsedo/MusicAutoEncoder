@@ -3,6 +3,11 @@ _author_ : Samuel Berrien
 
 # Requirements
 
+Installed and exported in PATH :
+```
+ffmpeg
+```
+
 Python 3.6 pip packages :
 ```
 torch
