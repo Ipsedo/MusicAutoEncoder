@@ -1,6 +1,6 @@
 import argparse
 from os import walk, mkdir, listdir
-from os.path import splitext, basename, join, exists
+from os.path import splitext, basename, join, exists, isfile
 import subprocess
 
 import torch as th
@@ -9,6 +9,7 @@ import scipy
 from scipy.signal import spectrogram
 from scipy.io import wavfile
 
+from random import shuffle
 from math import ceil, floor
 
 from typing import Tuple
@@ -150,6 +151,8 @@ def ifft_samples(fft_samples: np.ndarray, nfft: int) -> np.ndarray:
 def __read_wavs_without_copy(wav_root: str, nb_wav: int, sample_rate: int, n_fft: int, sec: int) -> th.Tensor:
     wav_files = [join(wav_root, f) for f in listdir(wav_root) if splitext(f)[-1] == ".wav"]
 
+    shuffle(wav_files)
+
     if len(wav_files) > nb_wav:
         wav_files = wav_files[:nb_wav]
 
@@ -254,7 +257,13 @@ def main() -> None:
         wavfile.write("test.wav", sampling_rate, new_raw_audio.reshape(-1))
 
     elif args.mode == "process":
-        convert_mp3_to_wav_2(args.audio_root, args.out_dir, args.limit)
+        if not exists(args.out_dir):
+            mkdir(args.out_dir)
+        if exists(args.out_dir) and isfile(args.out_dir):
+            print(f"{args.out_dir} already exists and is a file.")
+            exit()
+
+        convert_mp3_to_wav(args.audio_root, args.out_dir, args.limit)
     elif args.mode == "save":
         data = __read_wavs_without_copy(args.wav_root, args.nb_wav, args.sample_rate, args.n_fft, args.seconds)
         th.save(data, args.out_tensor_file)
