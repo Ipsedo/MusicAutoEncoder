@@ -97,9 +97,9 @@ def main() -> None:
         enc.load_state_dict(th.load(encoder_path))
         dec.load_state_dict(th.load(decoder_path))
         disc.load_state_dict(th.load(disc_path))
-        optim_ae.load_state_dict(th.load(aeoptim_path))
-        optim_disc.load_state_dict(th.load(discoptim_path))
-        optim_gen.load_state_dict(th.load(genoptim_path))
+        # optim_ae.load_state_dict(th.load(aeoptim_path))
+        # optim_disc.load_state_dict(th.load(discoptim_path))
+        # optim_gen.load_state_dict(th.load(genoptim_path))
 
     batch_size = 4
     nb_batch = ceil(data.size(0) / batch_size)
