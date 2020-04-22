@@ -59,7 +59,7 @@ def main() -> None:
 
     print(len(sentences))
 
-    ft = gensim.models.fasttext.FastText(sentences=sentences, size=size, workers=8, window=5, word_ngrams=5, cbow_mean=0)
+    ft = gensim.models.fasttext.FastText(sentences=sentences, size=size, workers=8, window=5, word_ngrams=5)
 
     ft.save(out_ft_file)
 
