@@ -1,0 +1,20 @@
+/home/samuel/venvs/env_36/bin/python3.6 /home/samuel/Documents/MusicAutoEncoder/train.py --archi 4bis --nfft 49 --sample-rate 44100 --seconds 1 --lr-ae 3e-6 --lr-disc 1e-7 --tensor-file /home/samuel/Documents/MusicAutoEncoder/res/my_music_60song_44100-49_1s.pt --out-model-dir /home/samuel/Documents/MusicAutoEncoder/out_archi4bis_nfft49_60song_test_1
+Opening saved torch Tensor....
+  0%|          | 0/16416 [00:00<?, ?it/s]Shuffle data...
+100%|██████████| 16416/16416 [00:01<00:00, 12836.23it/s]
+torch.Size([16417, 98, 900])
+Creating pytorch stuff...
+  0%|          | 0/4105 [00:00<?, ?it/s]Hidden layer size : 25
+Start learning...
+Epoch  0 : ae_avg = 0.332146, disc_avg = 2.096987, gen_avg = 1.052123 : 100%|██████████| 4105/4105 [1:15:30<00:00,  1.10s/it]
+Epoch  1 : ae_avg = 0.246003, disc_avg = 2.092115, gen_avg = 1.047030 : 100%|██████████| 4105/4105 [1:17:28<00:00,  1.13s/it]
+Epoch  2 : ae_avg = 0.218042, disc_avg = 2.089046, gen_avg = 1.046144 : 100%|██████████| 4105/4105 [1:17:36<00:00,  1.13s/it]
+Epoch  3 : ae_avg = 0.196034, disc_avg = 2.085625, gen_avg = 1.043493 : 100%|██████████| 4105/4105 [1:16:28<00:00,  1.12s/it]
+Epoch  4 : ae_avg = 0.187341, disc_avg = 2.082773, gen_avg = 1.040745 : 100%|██████████| 4105/4105 [1:18:06<00:00,  1.14s/it]
+Epoch  5 : ae_avg = 0.179248, disc_avg = 2.080218, gen_avg = 1.039370 : 100%|██████████| 4105/4105 [1:16:04<00:00,  1.11s/it]
+Epoch  6 : ae_avg = 0.170272, disc_avg = 2.077741, gen_avg = 1.037864 : 100%|██████████| 4105/4105 [1:16:30<00:00,  1.12s/it]
+Epoch  7 : ae_avg = 0.165004, disc_avg = 2.075541, gen_avg = 1.035900 : 100%|██████████| 4105/4105 [1:16:25<00:00,  1.12s/it]
+Epoch  8 : ae_avg = 0.161629, disc_avg = 2.072847, gen_avg = 1.033644 : 100%|██████████| 4105/4105 [1:16:59<00:00,  1.13s/it]
+Epoch  9 : ae_avg = 0.158602, disc_avg = 2.069986, gen_avg = 1.030220 : 100%|██████████| 4105/4105 [1:15:08<00:00,  1.10s/it]
+
+Process finished with exit code 0
