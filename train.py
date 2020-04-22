@@ -28,6 +28,16 @@ def main() -> None:
     parser.add_argument("--lr-disc", type=float, default=8e-5, dest="lr_discriminator")
     parser.add_argument("--out-model-dir", type=str, required=True, dest="out_dir")
 
+    subparser = parser.add_subparsers(dest="mode")
+
+    overfit_partser = subparser.add_parser("overfit")
+    overfit_partser.add_argument("--encoder-path", type=str, required=True, dest="encoder_path")
+    overfit_partser.add_argument("--decoder-path", type=str, required=True, dest="decoder_path")
+    overfit_partser.add_argument("--disc-path", type=str, required=True, dest="disc_path")
+    overfit_partser.add_argument("--aeoptim-path", type=str, required=True, dest="aeoptim_path")
+    overfit_partser.add_argument("--discoptim-path", type=str, required=True, dest="discoptim_path")
+    overfit_partser.add_argument("--genoptim-path", type=str, required=True, dest="genoptim_path")
+
     args = parser.parse_args()
 
     tensor_file = args.tensor_file
@@ -73,13 +83,28 @@ def main() -> None:
     ae_loss_fn = nn.MSELoss(reduction="none").cuda(0)
 
     optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=lr_auto_encoder)
-    optim_disc = th.optim.Adam(disc.parameters(), lr=lr_discriminator)
-    optim_gen = th.optim.Adam(enc.parameters(), lr=lr_discriminator)
+    optim_disc = th.optim.SGD(disc.parameters(), lr=lr_discriminator)
+    optim_gen = th.optim.SGD(enc.parameters(), lr=lr_discriminator)
+
+    if args.mode and args.mode == "overfit":
+        encoder_path = args.encoder_path
+        decoder_path = args.decoder_path
+        disc_path = args.disc_path
+        aeoptim_path = args.aeoptim_path
+        discoptim_path = args.discoptim_path
+        genoptim_path = args.genoptim_path
+
+        enc.load_state_dict(th.load(encoder_path))
+        dec.load_state_dict(th.load(decoder_path))
+        disc.load_state_dict(th.load(disc_path))
+        optim_ae.load_state_dict(th.load(aeoptim_path))
+        optim_disc.load_state_dict(th.load(discoptim_path))
+        optim_gen.load_state_dict(th.load(genoptim_path))
 
     batch_size = 4
     nb_batch = ceil(data.size(0) / batch_size)
 
-    nb_epoch = 15
+    nb_epoch = 10
 
     print("Start learning...")
     for e in range(nb_epoch):
@@ -100,6 +125,9 @@ def main() -> None:
             i_min = b_idx * batch_size
             i_max = (b_idx + 1) * batch_size
             i_max = i_max if i_max < data.size(0) else data.size(0)
+
+            if i_max - i_min == 1:
+                continue
 
             x_batch = data[i_min:i_max].cuda()
 
@@ -145,6 +173,9 @@ def main() -> None:
                 i_max_disc = (b_idx_disc + 1) * batch_size_disc
                 i_max_disc = i_max_disc if i_max_disc < z.size(0) else z.size(0)
 
+                if i_max_disc - i_min_disc == 1:
+                    continue
+
                 b_z = z[i_min_disc:i_max_disc]
                 b_z_prime = z_prime[i_min_disc:i_max_disc]
 
@@ -175,6 +206,9 @@ def main() -> None:
                 i_max_gen = (b_idx_gen + 1) * batch_size_gen
                 i_max_gen = i_max_gen if i_max_gen < z.size(0) else z.size(0)
 
+                if i_max_gen - i_min_gen == 1:
+                    continue
+
                 b_z = z[i_min_gen:i_max_gen]
                 d_z = disc(b_z)
 
@@ -189,7 +223,7 @@ def main() -> None:
             tqdm_pbar.set_description(f"Epoch {e:2d} : "
                                       f"ae_avg = {sum_loss_ae / nb_backward_ae:.6f}, "
                                       f"disc_avg = {sum_loss_disc / nb_backward_disc:.6f}, "
-                                      f"gen_avg = {sum_loss_gen / nb_backward_gen:.6f}")
+                                      f"gen_avg = {sum_loss_gen / nb_backward_gen:.6f} ")
 
         th.save(enc.state_dict(), join(out_dir, f"{enc}_epoch-{e}.th"))
         th.save(dec.state_dict(), join(out_dir, f"{dec}_epoch-{e}.th"))
