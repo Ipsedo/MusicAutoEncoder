@@ -6,7 +6,6 @@ _author_ : Samuel Berrien
 Python 3.6 pip packages :
 ```
 torch
-scipy
 numpy
 scipy
 tqdm
@@ -23,6 +22,15 @@ Then clone the repo :
 $ git clone https://github.com/Ipsedo/MusicAutoEncoder.git
 ```
 
+# Usage
+
+The argparse module gives help information with :
+```bash
+$ python script.py -h
+```
+
+## Train
+
 Create your set of wav files for training, in this example mp3 files are assumed to be in `/path/to/mp3` and we will convert `100` files in wav to `/path/to/wav` out directory :
 ```bash
 $ python read_audio.py --mp3-root /path/to/mp3 --out-dir /path/to/wav -l 100
@@ -38,3 +46,11 @@ Finally start the training :
 ```bash
 $ python train.py -h # TODO
 ```
+
+## Inference
+
+TODO
+
+## Generation
+
+TODO
