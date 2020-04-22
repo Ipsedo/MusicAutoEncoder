@@ -92,6 +92,23 @@ def fft_raw_audio(raw_audio_split: np.ndarray, nfft: int) -> np.ndarray:
     return np.apply_along_axis(lambda sub_split: scipy.fft(sub_split), 2, splitted_data)
 
 
+def ifft_samples(fft_samples: np.ndarray, nfft: int) -> np.ndarray:
+    assert len(fft_samples.shape) == 3, \
+        f"Wrong spectrogram shape len (actual : {len(fft_samples.shape)}, needed : {3})"
+    assert fft_samples.shape[1] == nfft, f"Only same nfft length for the moment"
+    assert fft_samples.dtype == np.complex128, \
+        f"Wrong ndarray dtype (actual : {fft_samples.dtype}, needed : {np.complex128})"
+
+    """return np.real(np.apply_along_axis(lambda fft_values: scipy.ifft(fft_values, n=nfft), 2, fft_samples)) \
+        .reshape(fft_samples.shape[0], -1)"""
+    fft_samples = fft_samples.transpose((0, 2, 1)).reshape(-1, nfft)
+    return np.real(np.apply_along_axis(lambda fft_values: scipy.ifft(fft_values, n=nfft), 1, fft_samples))
+
+
+###############
+# Main
+###############
+
 def convert_mp3_to_wav(root_dir: str, out_dir: str, limit: int) -> None:
     cpt = 0
     if not exists(out_dir):
@@ -130,23 +147,6 @@ def copy_mp3_2(root_dir: str, out_dir: str, limit_per_dir: int = 1) -> None:
                     subprocess.call(["cp", join(dirname, filename), out_dir])
                     cpt[dirname] += 1
 
-
-def ifft_samples(fft_samples: np.ndarray, nfft: int) -> np.ndarray:
-    assert len(fft_samples.shape) == 3, \
-        f"Wrong spectrogram shape len (actual : {len(fft_samples.shape)}, needed : {3})"
-    assert fft_samples.shape[1] == nfft, f"Only same nfft length for the moment"
-    assert fft_samples.dtype == np.complex128, \
-        f"Wrong ndarray dtype (actual : {fft_samples.dtype}, needed : {np.complex128})"
-
-    """return np.real(np.apply_along_axis(lambda fft_values: scipy.ifft(fft_values, n=nfft), 2, fft_samples)) \
-        .reshape(fft_samples.shape[0], -1)"""
-    fft_samples = fft_samples.transpose((0, 2, 1)).reshape(-1, nfft)
-    return np.real(np.apply_along_axis(lambda fft_values: scipy.ifft(fft_values, n=nfft), 1, fft_samples))
-
-
-###############
-# Main
-###############
 
 def __read_wavs_without_copy(wav_root: str, nb_wav: int, sample_rate: int, n_fft: int, sec: int) -> th.Tensor:
     wav_files = [join(wav_root, f) for f in listdir(wav_root) if splitext(f)[-1] == ".wav"]
