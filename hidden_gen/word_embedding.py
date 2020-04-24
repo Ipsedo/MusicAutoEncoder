@@ -6,7 +6,10 @@ from typing import List
 import re
 
 import torch as th
+import fasttext
+import fasttext.util as util
 import gensim
+import gensim.models.wrappers as gensim_wrapper
 
 from tqdm import tqdm
 
@@ -30,10 +33,15 @@ def gen_embedding(ft_model_file: str, sentence: str, hidden_length: int, n_chann
     words = words[:-(len(words) % hidden_length)]
     res = th.zeros(1, len(words), n_channel)
 
-    ft = gensim.models.fasttext.FastText.load(ft_model_file)
+    #ft = gensim.models.fasttext.FastText.load(ft_model_file)
+    print("Load FastText model")
+    #ft = gensim_wrapper.FastText.load_fasttext_format(ft_model_file)
+    ft = fasttext.load_model(ft_model_file)
+    ft = util.reduce_model(ft, n_channel)
 
+    print("Create word embedding vectors")
     for i, w in enumerate(words):
-        vec = th.tensor(ft.wv[w], dtype=th.float)
+        vec = th.tensor(ft[w], dtype=th.float)
         res[0, i, :] = vec
 
     return res.permute(0, 2, 1)
