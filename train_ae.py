@@ -104,7 +104,7 @@ def main() -> None:
     batch_size = 4
     nb_batch = ceil(data.size(0) / batch_size)
 
-    nb_epoch = 10
+    nb_epoch = 15
 
     print("Start learning...")
     for e in range(nb_epoch):
