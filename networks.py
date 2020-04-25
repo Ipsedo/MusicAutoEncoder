@@ -800,6 +800,63 @@ class Discriminator(nn.Module):
         return f"Discriminator_{self.n_channel}"
 
 
+####################################################
+# Discriminator CNN
+# designed for nFFT = 49 and sampling_rate = 44100
+####################################################
+
+class DiscriminatorCNN(nn.Module):
+    def __init__(self, n_fft: int):
+        super().__init__()
+
+        self.n_channel = n_fft * 2
+
+        self.cnn = nn.Sequential(
+            nn.Conv1d(self.n_channel,
+                      int(self.n_channel * 1.2),
+                      kernel_size=3, padding=1),
+            nn.CELU(),
+            nn.Conv1d(int(self.n_channel * 1.2),
+                      int(self.n_channel * 1.2 ** 2),
+                      kernel_size=5, stride=2, padding=2),
+            nn.CELU(),
+            nn.Conv1d(int(self.n_channel * 1.2 ** 2),
+                      int(self.n_channel * 1.2 ** 3),
+                      kernel_size=5, stride=2, padding=2),
+            nn.CELU(),
+            nn.Conv1d(int(self.n_channel * 1.2 ** 3),
+                      int(self.n_channel * 1.2 ** 4),
+                      kernel_size=7, stride=3, padding=3),
+            nn.CELU(),
+            nn.Conv1d(int(self.n_channel * 1.2 ** 4),
+                      int(self.n_channel * 1.2 ** 5),
+                      kernel_size=7, stride=3, padding=3),
+            nn.CELU()
+        )
+
+        self.classif = nn.Sequential(
+            nn.Linear(int(self.n_channel * 1.2 ** 5) * 25, 4096 * 2),
+            nn.CELU(),
+            nn.Linear(4096 * 2, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        out = self.cnn(x)
+        out = out.flatten(1, 2)
+        out = self.classif(out)
+        return out.view(-1)
+
+    def __str__(self):
+        return self.__get_str()
+
+    def __repr__(self):
+        return self.__get_str()
+
+    def __get_str(self):
+        return f"DiscriminatorCNN_{self.n_channel}"
+
+
 def discriminator_loss(d_z_prime, d_z):
     assert len(d_z_prime.size()) == 1, \
         f"Wrong z_prime size, actual : {d_z_prime.size()}, needed : (N)."
@@ -808,7 +865,7 @@ def discriminator_loss(d_z_prime, d_z):
     assert d_z_prime.size(0) == d_z.size(0), \
         f"z_prime en z must have the same batch size, z_fake : {d_z_prime.size(0)} and z_real : {d_z.size(0)}"
 
-    return -th.mean(th.log2(d_z_prime) + th.log2(1. - d_z), dim=0)
+    return th.mean(-(th.log2(d_z_prime) + th.log2(1. - d_z)), dim=0)
 
 
 def generator_loss(d_z):
@@ -816,3 +873,10 @@ def generator_loss(d_z):
         f"Wrong z size, actual : {d_z.size()}, needed : (N)."
 
     return -th.mean(th.log2(d_z), dim=0)
+
+
+def generator_loss_2(d_z):
+    assert len(d_z.size()) == 1, \
+        f"Wrong z size, actual : {d_z.size()}, needed : (N)."
+
+    return th.mean(th.log2(1. - d_z), dim=0)
