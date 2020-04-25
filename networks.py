@@ -837,6 +837,7 @@ class DiscriminatorCNN(nn.Module):
         self.classif = nn.Sequential(
             nn.Linear(int(self.n_channel * 1.2 ** 5) * 25, 4096 * 2),
             nn.CELU(),
+            nn.Dropout(0.2),
             nn.Linear(4096 * 2, 1),
             nn.Sigmoid()
         )

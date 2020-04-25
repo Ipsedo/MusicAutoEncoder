@@ -94,7 +94,8 @@ def main() -> None:
             i_max = i_max if i_max < data.size(0) else data.size(0)
 
             x_real = data[i_min:i_max, :, :].cuda()
-            z_fake = th.randn(x_real.size(0), gen.get_hidden_size(), hidden_size, dtype=th.float).cuda()
+            z_fake = th.randn(x_real.size(0), gen.get_hidden_size(), hidden_size,
+                              dtype=th.float, device=th.device("cuda"))
 
             # Discriminator
             disc.train()
