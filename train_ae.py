@@ -11,11 +11,11 @@ import torch.nn as nn
 from math import ceil
 import random
 
-import auto_encoder
+import networks
 
 
 def main() -> None:
-    coder_maker = auto_encoder.CoderMaker()
+    coder_maker = networks.CoderMaker()
 
     parser = argparse.ArgumentParser("Train audio auto-encoder")
 
@@ -76,7 +76,7 @@ def main() -> None:
     enc = enc.cuda(0)
     dec = dec.cuda(0)
 
-    disc = auto_encoder.Discriminator(hidden_channel).cuda(0)
+    disc = networks.Discriminator(hidden_channel).cuda(0)
 
     print(f"Hidden layer size : {hidden_length}")
 
@@ -182,7 +182,7 @@ def main() -> None:
                 d_z = disc(b_z)
                 d_z_prime = disc(b_z_prime)
 
-                loss_disc = auto_encoder.discriminator_loss(d_z_prime, d_z)
+                loss_disc = networks.discriminator_loss(d_z_prime, d_z)
 
                 optim_disc.zero_grad()
                 loss_disc.backward(retain_graph=True)
@@ -212,7 +212,7 @@ def main() -> None:
                 b_z = z[i_min_gen:i_max_gen]
                 d_z = disc(b_z)
 
-                loss_gen = auto_encoder.generator_loss(d_z)
+                loss_gen = networks.generator_loss(d_z)
                 optim_gen.zero_grad()
                 loss_gen.backward(retain_graph=True)
                 optim_gen.step()
