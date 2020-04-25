@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 import torch as th
 
-from auto_encoder import CoderMaker
+from networks import CoderMaker
 import read_audio
 from hidden_gen import word_embedding
 
