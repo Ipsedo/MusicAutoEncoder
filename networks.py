@@ -865,7 +865,7 @@ def discriminator_loss(d_z_prime, d_z):
     assert d_z_prime.size(0) == d_z.size(0), \
         f"z_prime en z must have the same batch size, z_fake : {d_z_prime.size(0)} and z_real : {d_z.size(0)}"
 
-    return th.mean(-(th.log2(d_z_prime) + th.log2(1. - d_z)), dim=0)
+    return -th.mean(th.log2(d_z_prime) + th.log2(1. - d_z), dim=0)
 
 
 def generator_loss(d_z):
