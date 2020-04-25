@@ -225,14 +225,19 @@ def main() -> None:
                                       f"disc_avg = {sum_loss_disc / nb_backward_disc:.6f}, "
                                       f"gen_avg = {sum_loss_gen / nb_backward_gen:.6f} ")
 
-        th.save(enc.state_dict(), join(out_dir, f"{enc}_epoch-{e}.th"))
-        th.save(dec.state_dict(), join(out_dir, f"{dec}_epoch-{e}.th"))
+        th.save(enc.cpu().state_dict(), join(out_dir, f"{enc}_epoch-{e}.th"))
+        th.save(dec.cpu().state_dict(), join(out_dir, f"{dec}_epoch-{e}.th"))
         th.save(optim_ae.state_dict(), join(out_dir, f"optim_ae_epoch-{e}.th"))
-        th.save(ae_loss_fn.state_dict(), join(out_dir, f"loss_ae_fn_epoch-{e}.th"))
+        th.save(ae_loss_fn.cpu().state_dict(), join(out_dir, f"loss_ae_fn_epoch-{e}.th"))
         th.save(optim_gen.state_dict(), join(out_dir, f"optim_gen_epoch-{e}.th"))
 
-        th.save(disc.state_dict(), join(out_dir, f"{disc}_epoch-{e}.th"))
+        th.save(disc.cpu().state_dict(), join(out_dir, f"{disc}_epoch-{e}.th"))
         th.save(optim_disc.state_dict(), join(out_dir, f"optim_disc_epoch-{e}.th"))
+
+        enc = enc.cuda(0)
+        dec = dec.cuda(0)
+        disc = disc.cuda(0)
+        ae_loss_fn = ae_loss_fn.cuda(0)
 
 
 if __name__ == "__main__":

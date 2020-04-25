@@ -122,7 +122,7 @@ def main() -> None:
             out_fake = disc(x_fake)
 
             optim_gen.zero_grad()
-            loss = networks.generator_loss_2(out_fake)
+            loss = networks.generator_loss(out_fake)
             loss.backward()
             optim_gen.step()
 
@@ -133,10 +133,13 @@ def main() -> None:
                                      f"disc_avg = {sum_loss_disc / nb_backward_disc:.6f}, "
                                      f"gen_avg = {sum_loss_gen / nb_backward_gen:.6f} ")
 
-        th.save(gen.state_dict(), join(out_dir, f"{gen}_epoch-{e}.th"))
+        th.save(gen.cpu().state_dict(), join(out_dir, f"{gen}_epoch-{e}.th"))
         th.save(optim_gen.state_dict(), join(out_dir, f"optim_gen_epoch-{e}.th"))
-        th.save(disc.state_dict(), join(out_dir, f"{disc}_epoch-{e}.th"))
+        th.save(disc.cpu().state_dict(), join(out_dir, f"{disc}_epoch-{e}.th"))
         th.save(optim_disc.state_dict(), join(out_dir, f"optim_disc_epoch-{e}.th"))
+
+        gen = gen.to(th.device("cuda"))
+        disc = disc.to(th.device("cuda"))
 
 
 if __name__ == '__main__':
