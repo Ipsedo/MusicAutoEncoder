@@ -6,13 +6,13 @@ import numpy as np
 
 from scipy.io import wavfile
 
-import auto_encoder
+import networks
 import read_audio
 from hidden_gen import normal_dist, word_embedding
 
 
 def main() -> None:
-    coder_maker = auto_encoder.CoderMaker()
+    coder_maker = networks.CoderMaker()
 
     parser = argparse.ArgumentParser("Generate Audio main")
 
