@@ -45,7 +45,7 @@ def main() -> None:
         dec = coder_maker["decoder", archi, n_fft]
 
         hidden_length = sample_rate // n_fft // dec.division_factor()
-        hidden_channel = dec.get_hidden_size()
+        hidden_channel = dec.hidden_channels()
         dec.load_state_dict(th.load(decoder_path))
 
         print("Random hidden representation generation")

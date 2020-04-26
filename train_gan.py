@@ -69,13 +69,11 @@ def main() -> None:
     assert data.size(2) // gen.division_factor() == hidden_size, \
         f"Wrong hidden size, data : {data.size(2) // gen.division_factor()}, expected : {hidden_size}"
 
-    nb_epoch = 30
+    nb_epoch = 50
     batch_size = 4
     nb_batch = data.size(0) // batch_size
 
     print("Train discriminator")
-
-    loss_fn = nn.BCELoss().cuda()
 
     # Train Disc
     for e in range(nb_epoch):
@@ -85,7 +83,7 @@ def main() -> None:
         nb_backward_disc = 0
 
         sum_loss_gen = 0
-        nb_backward_gen = 1
+        nb_backward_gen = 0
 
         tqdm_bar = tqdm(range(nb_batch))
         for b_idx in tqdm_bar:
@@ -94,7 +92,7 @@ def main() -> None:
             i_max = i_max if i_max < data.size(0) else data.size(0)
 
             x_real = data[i_min:i_max, :, :].cuda()
-            z_fake = th.randn(x_real.size(0), gen.get_hidden_size(), hidden_size,
+            z_fake = th.randn(x_real.size(0), gen.hidden_channels(), hidden_size,
                               dtype=th.float, device=th.device("cuda"))
 
             # Discriminator
@@ -118,7 +116,7 @@ def main() -> None:
             disc.eval()
             gen.train()
 
-            z_fake = th.randn(i_max - i_min, gen.get_hidden_size(), hidden_size, dtype=th.float).cuda()
+            z_fake = th.randn(i_max - i_min, gen.hidden_channels(), hidden_size, dtype=th.float).cuda()
             x_fake = gen(z_fake)
             out_fake = disc(x_fake)
 
@@ -133,6 +131,10 @@ def main() -> None:
             tqdm_bar.set_description(f"Epoch {e:2d} : "
                                      f"disc_avg = {sum_loss_disc / nb_backward_disc:.6f}, "
                                      f"gen_avg = {sum_loss_gen / nb_backward_gen:.6f} ")
+
+            if th.isnan(loss).any():
+                print("NaN detected - Exiting :,(")
+                exit()
 
         th.save(gen.cpu().state_dict(), join(out_dir, f"{gen}_epoch-{e}.th"))
         th.save(optim_gen.state_dict(), join(out_dir, f"optim_gen_epoch-{e}.th"))

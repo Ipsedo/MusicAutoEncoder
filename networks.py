@@ -50,7 +50,7 @@ class Coder(nn.Module):
         self._n_fft = n_fft
 
     @abc.abstractmethod
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return -1
 
     @abc.abstractmethod
@@ -102,7 +102,7 @@ class EncoderSmall(Coder):
     def _get_str(self):
         return f"EncoderSmall_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel + 128
 
     def division_factor(self) -> int:
@@ -138,7 +138,7 @@ class DecoderSmall(Coder):
     def _get_str(self):
         return f"DecoderSmall_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel
 
     def division_factor(self) -> int:
@@ -188,7 +188,7 @@ class Encoder1(Coder):
     def _get_str(self):
         return f"Encoder1_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel * 2
 
     def division_factor(self) -> int:
@@ -232,7 +232,7 @@ class Decoder1(Coder):
     def _get_str(self):
         return f"Decoder1_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel
 
     def division_factor(self) -> int:
@@ -284,7 +284,7 @@ class Encoder2(Coder):
     def _get_str(self):
         return f"Encoder2_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel * 2
 
     def division_factor(self) -> int:
@@ -332,7 +332,7 @@ class Decoder2(Coder):
     def _get_str(self):
         return f"Decoder2_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel
 
     def division_factor(self) -> int:
@@ -381,7 +381,7 @@ class Encoder3(Coder):
     def _get_str(self):
         return f"Encoder3_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel * 2
 
     def division_factor(self) -> int:
@@ -425,7 +425,7 @@ class Decoder3(Coder):
     def _get_str(self):
         return f"Decoder3_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel
 
     def division_factor(self) -> int:
@@ -468,7 +468,7 @@ class Encoder4(Coder):
     def forward(self, x):
         return self.cnn_enc(x)
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel * 2
 
     def division_factor(self) -> int:
@@ -519,7 +519,7 @@ class Decoder4(Coder):
     def _get_str(self):
         return f"Decoder4_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel
 
     def division_factor(self) -> int:
@@ -561,7 +561,7 @@ class Encoder4Bis(Coder):
     def forward(self, x):
         return self.cnn_enc(x)
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return int(self.n_channel * 1.5 ** 5)
 
     def division_factor(self) -> int:
@@ -611,7 +611,7 @@ class Decoder4Bis(Coder):
     def _get_str(self):
         return f"DecoderBis4_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel
 
     def division_factor(self) -> int:
@@ -664,7 +664,7 @@ class Encoder2Bis(Coder):
     def _get_str(self):
         return f"Encoder2Bis_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return int(self.n_channel * 1.5 ** 5)
 
     def division_factor(self) -> int:
@@ -712,7 +712,7 @@ class Decoder2Bis(Coder):
     def _get_str(self):
         return f"Decoder2Bis_{self.n_channel}"
 
-    def get_hidden_size(self) -> int:
+    def hidden_channels(self) -> int:
         return self.n_channel
 
     def division_factor(self) -> int:
@@ -836,8 +836,8 @@ class DiscriminatorCNN(nn.Module):
 
         self.classif = nn.Sequential(
             nn.Linear(int(self.n_channel * 1.2 ** 5) * 25, 4096 * 2),
+            nn.Dropout(0.3),
             nn.CELU(),
-            nn.Dropout(0.2),
             nn.Linear(4096 * 2, 1),
             nn.Sigmoid()
         )

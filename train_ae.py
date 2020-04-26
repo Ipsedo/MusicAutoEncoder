@@ -72,7 +72,7 @@ def main() -> None:
     dec = coder_maker["decoder", archi, n_fft]
 
     hidden_length = seconds * sample_rate // n_fft // enc.division_factor()
-    hidden_channel = enc.get_hidden_size()
+    hidden_channel = enc.hidden_channels()
     enc = enc.cuda(0)
     dec = dec.cuda(0)
 
