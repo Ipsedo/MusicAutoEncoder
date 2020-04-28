@@ -555,7 +555,7 @@ class Encoder4Bis(Coder):
             nn.Conv1d(int(self.n_channel * 1.5 ** 4),
                       int(self.n_channel * 1.5 ** 5),
                       kernel_size=7, stride=3, padding=3),
-            nn.ReLU()
+            nn.BatchNorm1d(int(self.n_channel * 1.5 ** 5))
         )
 
     def forward(self, x):
@@ -836,7 +836,6 @@ class DiscriminatorCNN(nn.Module):
 
         self.classif = nn.Sequential(
             nn.Linear(int(self.n_channel * 1.2 ** 5) * 25, 4096 * 2),
-            nn.Dropout(0.3),
             nn.CELU(),
             nn.Linear(4096 * 2, 1),
             nn.Sigmoid()
