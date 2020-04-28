@@ -21,19 +21,19 @@ from tqdm import tqdm
 # WAV stuff
 ###############
 
-def compute_wav_size(wav_path: str, split_length) -> Tuple[int, int]:
+def compute_wav_size(wav_path: str, nb_sec) -> Tuple[int, int]:
     sampling_rate, data = wavfile.read(wav_path)
-    split_size = sampling_rate * split_length // 1000
+    split_size = sampling_rate * nb_sec
     nb_split = floor(data.shape[0] / split_size)
     return nb_split, split_size
 
 
-def open_wav(wav_path: str, split_length: int) -> Tuple[int, np.ndarray]:
-    assert split_length > 1, f"Split length must be > 1 (actual == {split_length})."
+def open_wav(wav_path: str, nb_sec: int) -> Tuple[int, np.ndarray]:
+    assert nb_sec > 1, f"Split length must be > 1 (actual == {nb_sec})."
 
     sampling_rate, data = wavfile.read(wav_path)
 
-    split_size = sampling_rate * split_length // 1000
+    split_size = sampling_rate * nb_sec
     nb_split = floor(data.shape[0] / split_size)
 
     splitted_audio = np.asarray(np.split(data[:split_size * nb_split], nb_split))
@@ -86,7 +86,7 @@ def fft_raw_audio(raw_audio_split: np.ndarray, nfft: int) -> np.ndarray:
     max_value = raw_audio_split.max()
     min_value = raw_audio_split.min()
     assert max_value <= 1.0 and min_value >= -1., \
-        f"Raw audio values must be normlized between [-1., 0.] (actual == [{min_value}, {max_value}])."
+        f"Raw audio values must be normlized between [-1., 1.] (actual == [{min_value}, {max_value}])."
 
     splitted_data = np.stack(np.hsplit(raw_audio_split, raw_audio_split.shape[-1] / nfft), axis=-2)
     return np.apply_along_axis(lambda sub_split: scipy.fft(sub_split), 2, splitted_data)
@@ -161,14 +161,14 @@ def __read_wavs_without_copy(wav_root: str, nb_wav: int, sample_rate: int, n_fft
     n_sample = 0
 
     for w in tqdm(wav_files):
-        n_sample += compute_wav_size(w, sec * 1000)[0]
+        n_sample += compute_wav_size(w, sec)[0]
 
     data = th.zeros(n_sample, n_channel, fft_split_size, dtype=th.float)
 
     curr_split = 0
 
     for w in tqdm(wav_files):
-        _, raw_audio = open_wav(w, sec * 1000)
+        _, raw_audio = open_wav(w, sec)
         fft_audio = fft_raw_audio(raw_audio, n_fft).transpose((0, 2, 1))
 
         data[curr_split:curr_split + fft_audio.shape[0], :n_fft, :] = \
