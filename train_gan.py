@@ -6,7 +6,6 @@ from os.path import join, exists, isdir
 from tqdm import tqdm
 
 import torch as th
-import torch.nn as nn
 
 import random
 
@@ -19,6 +18,7 @@ def main() -> None:
     parser = argparse.ArgumentParser("Train audio auto-encoder")
 
     parser.add_argument("--archi", type=str, choices=coder_maker.models, dest="archi", required=True)
+    parser.add_argument("--from-decoder", type=str, dest="from_decoder")
     parser.add_argument("--nfft", type=int, dest="n_fft", required=True)
     parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
     parser.add_argument("--seconds", type=int, required=True, dest="seconds")
@@ -56,6 +56,10 @@ def main() -> None:
     print(data.size())
 
     gen = coder_maker["decoder", archi, n_fft]
+
+    if args.from_decoder is not None:
+        gen.load_state_dict(th.load(args.from_decoder))
+
     disc = networks.DiscriminatorCNN(n_fft)
 
     gen = gen.to(th.device("cuda"))
@@ -69,7 +73,7 @@ def main() -> None:
     assert data.size(2) // gen.division_factor() == hidden_size, \
         f"Wrong hidden size, data : {data.size(2) // gen.division_factor()}, expected : {hidden_size}"
 
-    nb_epoch = 50
+    nb_epoch = 100
     batch_size = 4
     nb_batch = data.size(0) // batch_size
 
@@ -85,13 +89,17 @@ def main() -> None:
         sum_loss_gen = 0
         nb_backward_gen = 0
 
-        tqdm_bar = tqdm(range(nb_batch))
+        shuffled_b_idx = list(range(nb_batch))
+        random.shuffle(shuffled_b_idx)
+        tqdm_bar = tqdm(shuffled_b_idx)
+
         for b_idx in tqdm_bar:
             i_min = b_idx * batch_size
             i_max = (b_idx + 1) * batch_size
             i_max = i_max if i_max < data.size(0) else data.size(0)
 
             x_real = data[i_min:i_max, :, :].cuda()
+
             z_fake = th.randn(x_real.size(0), gen.hidden_channels(), hidden_size,
                               dtype=th.float, device=th.device("cuda"))
 
