@@ -28,7 +28,7 @@ def main() -> None:
     archi = args.archi
     n_fft = args.n_fft
 
-    audio_data = read_audio.open_wav(input_wav, 1000)[1]
+    audio_data = read_audio.open_wav(input_wav, 1)[1]
     print(audio_data.shape)
     fft_data = read_audio.fft_raw_audio(audio_data, n_fft)
 

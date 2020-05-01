@@ -29,7 +29,7 @@ def compute_wav_size(wav_path: str, nb_sec) -> Tuple[int, int]:
 
 
 def open_wav(wav_path: str, nb_sec: int) -> Tuple[int, np.ndarray]:
-    assert nb_sec > 1, f"Split length must be > 1 (actual == {nb_sec})."
+    assert nb_sec > 0, f"Split length must be > 0 (actual == {nb_sec})."
 
     sampling_rate, data = wavfile.read(wav_path)
 
