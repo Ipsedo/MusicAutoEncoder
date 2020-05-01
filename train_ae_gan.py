@@ -15,8 +15,6 @@ import networks
 
 
 def main() -> None:
-    th.autograd.set_detect_anomaly(True)
-
     coder_maker = networks.CoderMaker()
 
     parser = argparse.ArgumentParser("Train audio auto-encoder")
@@ -33,13 +31,13 @@ def main() -> None:
 
     subparser = parser.add_subparsers(dest="mode")
 
-    overfit_partser = subparser.add_parser("overfit")
-    overfit_partser.add_argument("--encoder-path", type=str, required=True, dest="encoder_path")
-    overfit_partser.add_argument("--decoder-path", type=str, required=True, dest="decoder_path")
-    overfit_partser.add_argument("--disc-path", type=str, required=True, dest="disc_path")
-    overfit_partser.add_argument("--aeoptim-path", type=str, required=True, dest="aeoptim_path")
-    overfit_partser.add_argument("--discoptim-path", type=str, required=True, dest="discoptim_path")
-    overfit_partser.add_argument("--genoptim-path", type=str, required=True, dest="genoptim_path")
+    overfit_parser = subparser.add_parser("overfit")
+    overfit_parser.add_argument("--encoder-path", type=str, required=True, dest="encoder_path")
+    overfit_parser.add_argument("--decoder-path", type=str, required=True, dest="decoder_path")
+    overfit_parser.add_argument("--disc-path", type=str, required=True, dest="disc_path")
+    overfit_parser.add_argument("--aeoptim-path", type=str, required=True, dest="aeoptim_path")
+    overfit_parser.add_argument("--discoptim-path", type=str, required=True, dest="discoptim_path")
+    overfit_parser.add_argument("--genoptim-path", type=str, required=True, dest="genoptim_path")
 
     args = parser.parse_args()
 
@@ -107,7 +105,7 @@ def main() -> None:
     batch_size = 4
     nb_batch = ceil(data.size(0) / batch_size)
 
-    nb_epoch = 40
+    nb_epoch = 20
 
     print("Start learning...")
     for e in range(nb_epoch):
@@ -119,13 +117,13 @@ def main() -> None:
         nb_backward_disc = 0
         nb_backward_gen = 0
 
-        print("Shuffle data...")
-        for i in tqdm(range(data.size(0) - 1)):
-            j = i + random.randint(0, sys.maxsize) // (sys.maxsize // (data.size(0) - i) + 1)
+        nb_correct_real, nb_correct_fake = 0, 0
+        nb_pass_disc = 0
 
-            data[i, :, :], data[j, :, :] = data[j, :, :], data[i, :, :]
+        b_idxs = list(range(nb_batch))
+        random.shuffle(b_idxs)
+        tqdm_pbar = tqdm(b_idxs)
 
-        tqdm_pbar = tqdm(range(nb_batch))
         for b_idx in tqdm_pbar:
             i_min = b_idx * batch_size
             i_max = (b_idx + 1) * batch_size
@@ -134,7 +132,7 @@ def main() -> None:
             if i_max - i_min == 1:
                 continue
 
-            x_batch = data[i_min:i_max].cuda()
+            x_batch = data[i_min:i_max].cuda(0)
 
             # Auto Encoder
             enc.train()
@@ -153,12 +151,11 @@ def main() -> None:
             nb_backward_ae += 1
 
             # Discriminator
-            z_fake = th.randn(i_max - i_min, dec.hidden_channels(), hidden_length,
-                              dtype=th.float, device=th.device("cuda"))
-
             disc.train()
             dec.eval()
 
+            z_fake = th.nn.functional.celu(th.randn(i_max - i_min, dec.hidden_channels(), hidden_length,
+                                                    dtype=th.float, device=th.device("cuda:0")))
             x_fake = dec(z_fake)
 
             out_real = disc(x_batch)
@@ -173,12 +170,18 @@ def main() -> None:
             sum_loss_disc += loss_disc.item()
             nb_backward_disc += 1
 
+            nb_correct_real += (out_real > 0.5).sum().item()
+            nb_correct_fake += (out_fake <= 0.5).sum().item()
+            nb_pass_disc += out_real.size(0)
+
             # Generator
             disc.eval()
             dec.train()
 
-            z_fake = th.randn(i_max - i_min, dec.hidden_channels(), hidden_length, dtype=th.float).cuda()
+            z_fake = th.nn.functional.celu(th.randn(i_max - i_min, dec.hidden_channels(), hidden_length,
+                                                    dtype=th.float, device=th.device("cuda:0")))
             x_fake = dec(z_fake)
+
             out_fake = disc(x_fake)
 
             loss_gen = networks.generator_loss(out_fake)
@@ -193,7 +196,9 @@ def main() -> None:
             tqdm_pbar.set_description(f"Epoch {e:2d} : "
                                       f"ae_avg = {sum_loss_ae / nb_backward_ae:.6f}, "
                                       f"disc_avg = {sum_loss_disc / nb_backward_disc:.6f}, "
-                                      f"gen_avg = {sum_loss_gen / nb_backward_gen:.6f} ")
+                                      f"gen_avg = {sum_loss_gen / nb_backward_gen:.6f}, "
+                                      f"acc_real = {nb_correct_real / nb_pass_disc:.6f}, "
+                                      f"acc_fake = {nb_correct_fake / nb_pass_disc:.6f}")
 
         th.save(enc.cpu().state_dict(), join(out_dir, f"{enc}_epoch-{e}.th"))
         th.save(dec.cpu().state_dict(), join(out_dir, f"{dec}_epoch-{e}.th"))

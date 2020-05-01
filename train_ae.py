@@ -51,13 +51,6 @@ def main() -> None:
 
     print("Opening saved torch Tensor....")
     data = th.load(tensor_file)
-
-    print("Shuffle data...")
-    for i in tqdm(range(data.size(0) - 1)):
-        j = i + random.randint(0, sys.maxsize) // (sys.maxsize // (data.size(0) - i) + 1)
-
-        data[i, :, :], data[j, :, :] = data[j, :, :], data[i, :, :]
-
     print(data.size())
 
     print("Creating pytorch stuff...")
@@ -72,7 +65,7 @@ def main() -> None:
 
     print(f"Hidden layer size : {hidden_length}")
 
-    ae_loss_fn = nn.MSELoss(reduction="none").cuda(0)
+    ae_loss_fn = nn.MSELoss().cuda(0)
 
     optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=lr_auto_encoder)
 
@@ -94,10 +87,10 @@ def main() -> None:
 
         nb_backward_ae = 0
 
-        enc.train()
-        dec.train()
+        b_idxs = list(range(nb_batch))
+        random.shuffle(b_idxs)
+        tqdm_pbar = tqdm(b_idxs)
 
-        tqdm_pbar = tqdm(range(nb_batch))
         for b_idx in tqdm_pbar:
             i_min = b_idx * batch_size
             i_max = (b_idx + 1) * batch_size
@@ -115,24 +108,14 @@ def main() -> None:
             out_enc = enc(x_batch)
             out_dec = dec(out_enc)
 
-            loss_autoencoder = ae_loss_fn(out_dec, x_batch).mean(dim=1).view(-1)
+            loss = ae_loss_fn(out_dec, x_batch)
 
-            batch_size_dec = 32
-            nb_batch_dec = ceil(loss_autoencoder.size(0) / batch_size_dec)
+            optim_ae.zero_grad()
+            loss.backward()
+            optim_ae.step()
 
-            for b_idx_dec in range(nb_batch_dec):
-                i_min_dec = b_idx_dec * batch_size_dec
-                i_max_dec = (b_idx_dec + 1) * batch_size_dec
-                i_max_dec = i_max_dec if i_max_dec < loss_autoencoder.size(0) else loss_autoencoder.size(0)
-
-                loss_ae = loss_autoencoder[i_min_dec:i_max_dec].mean()
-
-                optim_ae.zero_grad()
-                loss_ae.backward(retain_graph=True)
-                optim_ae.step()
-
-                nb_backward_ae += 1
-                sum_loss_ae += loss_ae.item()
+            sum_loss_ae += loss.item()
+            nb_backward_ae += 1
 
             tqdm_pbar.set_description(f"Epoch {e:2d} : "
                                       f"ae_avg = {sum_loss_ae / nb_backward_ae:.6f} ")

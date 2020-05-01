@@ -46,13 +46,6 @@ def main() -> None:
 
     print("Opening saved torch Tensor....")
     data = th.load(tensor_file)
-
-    print("Shuffle data...")
-    for i in tqdm(range(data.size(0) - 1)):
-        j = i + random.randint(0, sys.maxsize) // (sys.maxsize // (data.size(0) - i) + 1)
-
-        data[i, :, :], data[j, :, :] = data[j, :, :], data[i, :, :]
-
     print(data.size())
 
     gen = coder_maker["decoder", archi, n_fft]
@@ -89,9 +82,9 @@ def main() -> None:
         sum_loss_gen = 0
         nb_backward_gen = 0
 
-        shuffled_b_idx = list(range(nb_batch))
-        random.shuffle(shuffled_b_idx)
-        tqdm_bar = tqdm(shuffled_b_idx)
+        b_idxs = list(range(nb_batch))
+        random.shuffle(b_idxs)
+        tqdm_bar = tqdm(b_idxs)
 
         for b_idx in tqdm_bar:
             i_min = b_idx * batch_size
