@@ -1,9 +1,8 @@
 import argparse
-import sys
 from os import mkdir
 from os.path import join, exists, isdir
-import pickle as pkl
 
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 import torch as th
@@ -133,7 +132,26 @@ def main() -> None:
         dec = dec.cuda(0)
         ae_loss_fn = ae_loss_fn.cuda(0)
 
-    pkl.dump(losses, open(join(out_dir, "losses.pk"), "wb"))
+    step = 500
+
+    plot_idxs = range(0, len(losses), step)
+    means = [losses[0]]
+    for i, l_idx in enumerate(plot_idxs[:-1]):
+        acc = 0
+        for j in range(l_idx, plot_idxs[i + 1]):
+            acc += losses[j]
+        means.append(acc / step)
+
+    new_losses = [losses[i] for i in plot_idxs]
+
+    plt.title(f"[AE] Train - {enc} & {dec} - {nb_epoch} epochs")
+    plt.plot(plot_idxs, new_losses, color="blue", label="loss values (MSE)")
+    plt.plot(plot_idxs, means, color="red", label="loss mean values (MSE)")
+    plt.ylabel("loss value")
+    plt.xlabel("batch idx")
+    plt.legend()
+
+    plt.savefig(join(out_dir, f"AE_loss_train_{enc}_{dec}_{nb_epoch}-epochs.png"))
 
 
 if __name__ == "__main__":
