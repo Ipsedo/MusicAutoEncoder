@@ -2,6 +2,7 @@ import argparse
 import sys
 from os import mkdir
 from os.path import join, exists, isdir
+import pickle as pkl
 
 from tqdm import tqdm
 
@@ -81,6 +82,8 @@ def main() -> None:
 
     nb_epoch = 15
 
+    losses = []
+
     print("Start learning...")
     for e in range(nb_epoch):
         sum_loss_ae = 0
@@ -116,6 +119,7 @@ def main() -> None:
 
             sum_loss_ae += loss.item()
             nb_backward_ae += 1
+            losses.append(loss.item())
 
             tqdm_pbar.set_description(f"Epoch {e:2d} : "
                                       f"ae_avg = {sum_loss_ae / nb_backward_ae:.6f} ")
@@ -128,6 +132,8 @@ def main() -> None:
         enc = enc.cuda(0)
         dec = dec.cuda(0)
         ae_loss_fn = ae_loss_fn.cuda(0)
+
+    pkl.dump(losses, open(join(out_dir, "losses.pk"), "wb"))
 
 
 if __name__ == "__main__":
