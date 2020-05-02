@@ -154,8 +154,8 @@ def main() -> None:
             disc.train()
             dec.eval()
 
-            z_fake = th.nn.functional.celu(th.randn(i_max - i_min, dec.hidden_channels(), hidden_length,
-                                                    dtype=th.float, device=th.device("cuda:0")))
+            z_fake = th.randn(i_max - i_min, dec.hidden_channels(), hidden_length,
+                              dtype=th.float, device=th.device("cuda:0"))
             x_fake = dec(z_fake)
 
             out_real = disc(x_batch)
@@ -178,8 +178,8 @@ def main() -> None:
             disc.eval()
             dec.train()
 
-            z_fake = th.nn.functional.celu(th.randn(i_max - i_min, dec.hidden_channels(), hidden_length,
-                                                    dtype=th.float, device=th.device("cuda:0")))
+            z_fake = th.randn(i_max - i_min, dec.hidden_channels(), hidden_length,
+                              dtype=th.float, device=th.device("cuda:0"))
             x_fake = dec(z_fake)
 
             out_fake = disc(x_fake)
