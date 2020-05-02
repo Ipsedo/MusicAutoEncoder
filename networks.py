@@ -44,22 +44,35 @@ class RandomZeroUnpool1d(ConstantUnpool1d):
 ####################################################
 
 class Coder(nn.Module):
-    def __init__(self, n_fft: int):
+    def __init__(self, n_fft: int, in_channel: int):
         super().__init__()
 
         self._n_fft = n_fft
+        self.in_channel = in_channel
+
+    @abc.abstractmethod
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
+        raise NotImplementedError("Coder._forward is abstract class !")
 
     @abc.abstractmethod
     def hidden_channels(self) -> int:
-        return -1
+        raise NotImplementedError("Coder.hidden_channels is abstract class !")
 
     @abc.abstractmethod
     def division_factor(self) -> int:
-        return 0
+        raise NotImplementedError("Coder.division_factor is abstract class !")
 
     @abc.abstractmethod
     def _get_str(self):
-        return "Coder"
+        raise NotImplementedError("Coder._get_str is abstract class !")
+
+    def forward(self, x):
+        assert len(x.size()) == 3, \
+            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
+        assert x.size(1) == self.in_channel, \
+            f"Wrong channel number, actual : {x.size(1)}, needed : {self.in_channel}."
+
+        return self._coder_forward(x)
 
     def __str__(self):
         return self._get_str()
@@ -74,36 +87,28 @@ class Coder(nn.Module):
 
 class EncoderSmall(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
-
-        n_channel = n_fft * 2
+        super().__init__(n_fft, n_fft * 2)
 
         self.cnn_enc = nn.Sequential(
-            nn.Conv1d(n_channel, n_channel + 32,
+            nn.Conv1d(self.in_channel, self.in_channel + 32,
                       kernel_size=3, padding=1),
-            nn.BatchNorm1d(n_channel + 32),
-            nn.Conv1d(n_channel + 32, n_channel + 64,
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + 32, self.in_channel + 64,
                       kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(n_channel + 64),
-            nn.Conv1d(n_channel + 64, n_channel + 128,
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + 64, self.in_channel + 128,
                       kernel_size=7, stride=3, padding=3),
-            nn.BatchNorm1d(n_channel + 128)
+            nn.BatchNorm1d(self.in_channel + 128)
         )
 
-        self.n_channel = n_channel
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_enc(x)
 
     def _get_str(self):
-        return f"EncoderSmall_{self.n_channel}"
+        return f"EncoderSmall_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return self.n_channel + 128
+        return self.in_channel + 128
 
     def division_factor(self) -> int:
         return 2 * 3
@@ -111,35 +116,27 @@ class EncoderSmall(Coder):
 
 class DecoderSmall(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
-
-        n_channel = n_fft * 2
+        super().__init__(n_fft, n_fft * 2 + 128)
 
         self.cnn_tr_dec = nn.Sequential(
-            nn.ConvTranspose1d(n_channel + 128, n_channel + 64,
+            nn.ConvTranspose1d(self.in_channel, self.in_channel - 64,
                                kernel_size=7, stride=3, padding=2),
-            nn.BatchNorm1d(n_channel + 64),
-            nn.ConvTranspose1d(n_channel + 64, n_channel + 32,
+            nn.CELU(),
+            nn.ConvTranspose1d(self.in_channel - 64, self.in_channel - (64 + 32),
                                kernel_size=5, stride=2, output_padding=1, padding=2),
-            nn.BatchNorm1d(n_channel + 32),
-            nn.ConvTranspose1d(n_channel + 32, n_channel,
+            nn.CELU(),
+            nn.ConvTranspose1d(self.in_channel - (64 + 32), self.in_channel - 128,
                                kernel_size=3, padding=1)
         )
 
-        self.n_channel = n_channel + 128
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_tr_dec(x)
 
     def _get_str(self):
-        return f"DecoderSmall_{self.n_channel}"
+        return f"DecoderSmall_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return self.n_channel
+        return self.in_channel
 
     def division_factor(self) -> int:
         return 3 * 2
@@ -151,45 +148,37 @@ class DecoderSmall(Coder):
 
 class Encoder1(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
-
-        n_channel = n_fft * 2
+        super().__init__(n_fft, n_fft * 2)
 
         n_layer = 4
 
         self.cnn_enc = nn.Sequential(
-            nn.Conv1d(n_channel, n_channel + int(n_channel / n_layer),
+            nn.Conv1d(self.in_channel, self.in_channel + int(self.in_channel / n_layer),
                       kernel_size=3, padding=1),
-            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
-            nn.Conv1d(n_channel + int(n_channel / n_layer),
-                      n_channel + int(2 * n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(self.in_channel / n_layer),
+                      self.in_channel + int(2 * self.in_channel / n_layer),
                       kernel_size=7, stride=3, padding=3),
-            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
-            nn.Conv1d(n_channel + int(2 * n_channel / n_layer),
-                      n_channel + int(3 * n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(2 * self.in_channel / n_layer),
+                      self.in_channel + int(3 * self.in_channel / n_layer),
                       kernel_size=9, stride=4, padding=4),
-            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
-            nn.Conv1d(n_channel + int(3 * n_channel / n_layer),
-                      n_channel + int(4 * n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(3 * self.in_channel / n_layer),
+                      self.in_channel + int(4 * self.in_channel / n_layer),
                       kernel_size=11, stride=5, padding=5),
-            nn.BatchNorm1d(n_channel + int(4 * n_channel / n_layer))
+            nn.BatchNorm1d(self.in_channel + int(4 * self.in_channel / n_layer))
 
         )
 
-        self.n_channel = n_channel
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_enc(x)
 
     def _get_str(self):
-        return f"Encoder1_{self.n_channel}"
+        return f"Encoder1_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return self.n_channel * 2
+        return self.in_channel * 2
 
     def division_factor(self) -> int:
         return 3 * 4 * 5
@@ -197,7 +186,7 @@ class Encoder1(Coder):
 
 class Decoder1(Coder):
     def __init__(self, n_fft):
-        super().__init__(n_fft)
+        super().__init__(n_fft, n_fft * 4)
 
         n_channel = n_fft * 2
         n_layer = 4
@@ -206,34 +195,28 @@ class Decoder1(Coder):
             nn.ConvTranspose1d(n_channel + int(4 * n_channel / n_layer),
                                n_channel + int(3 * n_channel / n_layer),
                                kernel_size=11, stride=5, padding=3),
-            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(3 * n_channel / n_layer),
                                n_channel + int(2 * n_channel / n_layer),
                                kernel_size=9, stride=4, padding=3, output_padding=1),
-            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(2 * n_channel / n_layer),
                                n_channel + int(n_channel / n_layer),
                                kernel_size=7, stride=3, padding=2),
-            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(n_channel / n_layer),
                                n_channel,
                                kernel_size=3, padding=1)
         )
 
-        self.n_channel = n_channel + int(4 * n_channel / n_layer)
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_tr_dec(x)
 
     def _get_str(self):
-        return f"Decoder1_{self.n_channel}"
+        return f"Decoder1_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return self.n_channel
+        return self.in_channel
 
     def division_factor(self) -> int:
         return 3 * 4 * 5
@@ -245,47 +228,40 @@ class Decoder1(Coder):
 
 class Encoder2(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
+        super().__init__(n_fft, n_fft * 2)
 
-        n_channel = n_fft * 2
         n_layer = 5
 
         self.cnn_enc = nn.Sequential(
-            nn.Conv1d(n_channel, n_channel + int(n_channel / n_layer),
+            nn.Conv1d(self.in_channel, self.in_channel + int(self.in_channel / n_layer),
                       kernel_size=3, padding=1),
-            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
-            nn.Conv1d(n_channel + int(n_channel / n_layer),
-                      n_channel + int(2 * n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(self.in_channel / n_layer),
+                      self.in_channel + int(2 * self.in_channel / n_layer),
                       kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
-            nn.Conv1d(n_channel + int(2 * n_channel / n_layer),
-                      n_channel + int(3 * n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(2 * self.in_channel / n_layer),
+                      self.in_channel + int(3 * self.in_channel / n_layer),
                       kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
-            nn.Conv1d(n_channel + int(3 * n_channel / n_layer),
-                      n_channel + int(4 * n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(3 * self.in_channel / n_layer),
+                      self.in_channel + int(4 * self.in_channel / n_layer),
                       kernel_size=7, stride=3, padding=2),
-            nn.BatchNorm1d(n_channel + int(4 * n_channel / n_layer)),
-            nn.Conv1d(n_channel + int(4 * n_channel / n_layer),
-                      n_channel + int(5 * n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(4 * self.in_channel / n_layer),
+                      self.in_channel + int(5 * self.in_channel / n_layer),
                       kernel_size=11, stride=5, padding=5),
-            nn.BatchNorm1d(n_channel + int(5 * n_channel / n_layer))
+            nn.BatchNorm1d(self.in_channel + int(5 * self.in_channel / n_layer))
         )
 
-        self.n_channel = n_channel
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_enc(x)
 
     def _get_str(self):
-        return f"Encoder2_{self.n_channel}"
+        return f"Encoder2_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return self.n_channel * 2
+        return self.in_channel * 2
 
     def division_factor(self) -> int:
         return 2 * 2 * 3 * 5
@@ -293,7 +269,7 @@ class Encoder2(Coder):
 
 class Decoder2(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
+        super().__init__(n_fft, n_fft * 4)
 
         n_channel = n_fft * 2
         n_layer = 5
@@ -302,38 +278,32 @@ class Decoder2(Coder):
             nn.ConvTranspose1d(n_channel * 2,
                                n_channel + int(4 * n_channel / n_layer),
                                kernel_size=11, stride=5, padding=3),
-            nn.BatchNorm1d(n_channel + int(4 * n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(4 * n_channel / n_layer),
                                n_channel + int(3 * n_channel / n_layer),
                                kernel_size=7, stride=3, padding=2),
-            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(3 * n_channel / n_layer),
                                n_channel + int(2 * n_channel / n_layer),
                                kernel_size=5, stride=2, padding=2, output_padding=1),
-            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(2 * n_channel / n_layer),
                                n_channel + int(n_channel / n_layer),
                                kernel_size=5, stride=2, padding=2, output_padding=1),
-            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(n_channel / n_layer),
                                n_channel,
                                kernel_size=3, padding=1)
         )
 
-        self.n_channel = n_channel * 2
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_tr_dec(x)
 
     def _get_str(self):
-        return f"Decoder2_{self.n_channel}"
+        return f"Decoder2_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return self.n_channel
+        return self.in_channel
 
     def division_factor(self) -> int:
         return 2 * 2 * 3 * 5
@@ -345,44 +315,37 @@ class Decoder2(Coder):
 
 class Encoder3(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
-
-        n_channel = n_fft * 2
+        super().__init__(n_fft, n_fft * 2)
+        
         n_layer = 4
 
         self.cnn_enc = nn.Sequential(
-            nn.Conv1d(n_channel,
-                      n_channel + int(n_channel / n_layer),
+            nn.Conv1d(self.in_channel,
+                      self.in_channel + int(self.in_channel / n_layer),
                       kernel_size=3, padding=1),
-            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
-            nn.Conv1d(n_channel + int(n_channel / n_layer),
-                      n_channel + int(2 * n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(self.in_channel / n_layer),
+                      self.in_channel + int(2 * self.in_channel / n_layer),
                       kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
-            nn.Conv1d(n_channel + int(2 * n_channel / n_layer),
-                      n_channel + int(3 * n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(2 * self.in_channel / n_layer),
+                      self.in_channel + int(3 * self.in_channel / n_layer),
                       kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
-            nn.Conv1d(n_channel + int(3 * n_channel / n_layer),
-                      n_channel + int(4 * n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(3 * self.in_channel / n_layer),
+                      self.in_channel + int(4 * self.in_channel / n_layer),
                       kernel_size=7, stride=3, padding=3),
-            nn.BatchNorm1d(n_channel + int(4 * n_channel / n_layer))
+            nn.BatchNorm1d(self.in_channel + int(4 * self.in_channel / n_layer))
         )
 
-        self.n_channel = n_channel
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_enc(x)
 
     def _get_str(self):
-        return f"Encoder3_{self.n_channel}"
+        return f"Encoder3_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return self.n_channel * 2
+        return self.in_channel * 2
 
     def division_factor(self) -> int:
         return 2 * 2 * 3
@@ -390,7 +353,7 @@ class Encoder3(Coder):
 
 class Decoder3(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
+        super().__init__(n_fft, n_fft * 4)
 
         n_channel = n_fft * 2
         n_layer = 4
@@ -399,34 +362,28 @@ class Decoder3(Coder):
             nn.ConvTranspose1d(n_channel + int(4 * n_channel / n_layer),
                                n_channel + int(3 * n_channel / n_layer),
                                kernel_size=7, stride=3, padding=2),
-            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(3 * n_channel / n_layer),
                                n_channel + int(2 * n_channel / n_layer),
                                kernel_size=5, stride=2, padding=2, output_padding=1),
-            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(2 * n_channel / n_layer),
                                n_channel + int(n_channel / n_layer),
                                kernel_size=5, stride=2, padding=2, output_padding=1),
-            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(n_channel / n_layer),
                                n_channel,
                                kernel_size=3, padding=1)
         )
 
-        self.n_channel = n_channel + int(4 * n_channel / n_layer)
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_tr_dec(x)
 
     def _get_str(self):
-        return f"Decoder3_{self.n_channel}"
+        return f"Decoder3_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return self.n_channel
+        return self.in_channel
 
     def division_factor(self) -> int:
         return 2 * 2 * 3
@@ -438,49 +395,48 @@ class Decoder3(Coder):
 
 class Encoder4(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
+        super().__init__(n_fft, n_fft * 2)
 
-        self.n_channel = n_fft * 2
         n_layer = 5
 
         self.cnn_enc = nn.Sequential(
-            nn.Conv1d(self.n_channel, self.n_channel + int(self.n_channel / n_layer),
+            nn.Conv1d(self.in_channel, self.in_channel + int(self.in_channel / n_layer),
                       kernel_size=3, padding=1),
-            nn.BatchNorm1d(self.n_channel + int(self.n_channel / n_layer)),
-            nn.Conv1d(self.n_channel + int(self.n_channel / n_layer),
-                      self.n_channel + int(2 * self.n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(self.in_channel / n_layer),
+                      self.in_channel + int(2 * self.in_channel / n_layer),
                       kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(self.n_channel + int(2 * self.n_channel / n_layer)),
-            nn.Conv1d(self.n_channel + int(2 * self.n_channel / n_layer),
-                      self.n_channel + int(3 * self.n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(2 * self.in_channel / n_layer),
+                      self.in_channel + int(3 * self.in_channel / n_layer),
                       kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(self.n_channel + int(3 * self.n_channel / n_layer)),
-            nn.Conv1d(self.n_channel + int(3 * self.n_channel / n_layer),
-                      self.n_channel + int(4 * self.n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(3 * self.in_channel / n_layer),
+                      self.in_channel + int(4 * self.in_channel / n_layer),
                       kernel_size=7, stride=3, padding=3),
-            nn.BatchNorm1d(self.n_channel + int(4 * self.n_channel / n_layer)),
-            nn.Conv1d(self.n_channel + int(4 * self.n_channel / n_layer),
-                      self.n_channel + int(5 * self.n_channel / n_layer),
+            nn.CELU(),
+            nn.Conv1d(self.in_channel + int(4 * self.in_channel / n_layer),
+                      self.in_channel + int(5 * self.in_channel / n_layer),
                       kernel_size=7, stride=3, padding=3),
-            nn.BatchNorm1d(self.n_channel + int(5 * self.n_channel / n_layer))
+            nn.BatchNorm1d(self.in_channel + int(5 * self.in_channel / n_layer))
         )
 
-    def forward(self, x):
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_enc(x)
 
     def hidden_channels(self) -> int:
-        return self.n_channel * 2
+        return self.in_channel * 2
 
     def division_factor(self) -> int:
         return 2 * 2 * 3 * 3
 
     def _get_str(self):
-        return f"Encoder4_{self.n_channel}"
+        return f"Encoder4_{self.in_channel}"
 
 
 class Decoder4(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
+        super().__init__(n_fft, n_fft * 4)
 
         n_channel = n_fft * 2
         n_layer = 5
@@ -489,38 +445,32 @@ class Decoder4(Coder):
             nn.ConvTranspose1d(n_channel * 2,
                                n_channel + int(4 * n_channel / n_layer),
                                kernel_size=7, stride=3, padding=2),
-            nn.BatchNorm1d(n_channel + int(4 * n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(4 * n_channel / n_layer),
                                n_channel + int(3 * n_channel / n_layer),
                                kernel_size=7, stride=3, padding=2),
-            nn.BatchNorm1d(n_channel + int(3 * n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(3 * n_channel / n_layer),
                                n_channel + int(2 * n_channel / n_layer),
                                kernel_size=5, stride=2, padding=2, output_padding=1),
-            nn.BatchNorm1d(n_channel + int(2 * n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(2 * n_channel / n_layer),
                                n_channel + int(n_channel / n_layer),
                                kernel_size=5, stride=2, padding=2, output_padding=1),
-            nn.BatchNorm1d(n_channel + int(n_channel / n_layer)),
+            nn.CELU(),
             nn.ConvTranspose1d(n_channel + int(n_channel / n_layer),
                                n_channel,
                                kernel_size=3, padding=1)
         )
 
-        self.n_channel = n_channel * 2
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_tr_dec(x)
 
     def _get_str(self):
-        return f"Decoder4_{self.n_channel}"
+        return f"Decoder4_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return self.n_channel
+        return self.in_channel
 
     def division_factor(self) -> int:
         return 2 * 2 * 3 * 3
@@ -532,48 +482,47 @@ class Decoder4(Coder):
 
 class Encoder4Bis(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
-
-        self.n_channel = n_fft * 2
+        super().__init__(n_fft, n_fft * 2)
 
         self.cnn_enc = nn.Sequential(
-            nn.Conv1d(self.n_channel, int(self.n_channel * 1.5 ** 1),
+            nn.Conv1d(self.in_channel, int(self.in_channel * 1.5 ** 1),
                       kernel_size=3, padding=1),
             nn.CELU(),
-            nn.Conv1d(int(self.n_channel * 1.5 ** 1),
-                      int(self.n_channel * 1.5 ** 2),
+            nn.Conv1d(int(self.in_channel * 1.5 ** 1),
+                      int(self.in_channel * 1.5 ** 2),
                       kernel_size=5, stride=2, padding=2),
             nn.CELU(),
-            nn.Conv1d(int(self.n_channel * 1.5 ** 2),
-                      int(self.n_channel * 1.5 ** 3),
+            nn.Conv1d(int(self.in_channel * 1.5 ** 2),
+                      int(self.in_channel * 1.5 ** 3),
                       kernel_size=5, stride=2, padding=2),
             nn.CELU(),
-            nn.Conv1d(int(self.n_channel * 1.5 ** 3),
-                      int(self.n_channel * 1.5 ** 4),
+            nn.Conv1d(int(self.in_channel * 1.5 ** 3),
+                      int(self.in_channel * 1.5 ** 4),
                       kernel_size=7, stride=3, padding=3),
             nn.CELU(),
-            nn.Conv1d(int(self.n_channel * 1.5 ** 4),
-                      int(self.n_channel * 1.5 ** 5),
+            nn.Conv1d(int(self.in_channel * 1.5 ** 4),
+                      int(self.in_channel * 1.5 ** 5),
                       kernel_size=7, stride=3, padding=3),
-            nn.CELU()
+            nn.BatchNorm1d(int(self.in_channel * 1.5 ** 5))
+            # TODO test batch norm only here
         )
 
-    def forward(self, x):
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_enc(x)
 
     def hidden_channels(self) -> int:
-        return int(self.n_channel * 1.5 ** 5)
+        return int(self.in_channel * 1.5 ** 5)
 
     def division_factor(self) -> int:
         return 2 * 2 * 3 * 3
 
     def _get_str(self):
-        return f"EncoderBis4_{self.n_channel}"
+        return f"EncoderBis4_{self.in_channel}"
 
 
 class Decoder4Bis(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
+        super().__init__(n_fft, int(n_fft * 2 * 1.5 ** 5))
 
         n_channel = n_fft * 2
 
@@ -599,20 +548,14 @@ class Decoder4Bis(Coder):
                                kernel_size=3, padding=1)
         )
 
-        self.n_channel = int(n_channel * 1.5 ** 5)
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_tr_dec(x)
 
     def _get_str(self):
-        return f"DecoderBis4_{self.n_channel}"
+        return f"DecoderBis4_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return self.n_channel
+        return self.in_channel
 
     def division_factor(self) -> int:
         return 2 * 2 * 3 * 3
@@ -624,48 +567,41 @@ class Decoder4Bis(Coder):
 
 class Encoder2Bis(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
+        super().__init__(n_fft, n_fft * 2)
 
-        n_channel = n_fft * 2
         n_layer = 5
 
         self.cnn_enc = nn.Sequential(
-            nn.Conv1d(n_channel, int(n_channel * 1.5 ** 1),
+            nn.Conv1d(self.in_channel, int(self.in_channel * 1.5 ** 1),
                       kernel_size=3, padding=1),
-            nn.BatchNorm1d(int(n_channel * 1.5 ** 1)),
-            nn.Conv1d(int(n_channel * 1.5 ** 1),
-                      int(n_channel * 1.5 ** 2),
+            nn.CELU(),
+            nn.Conv1d(int(self.in_channel * 1.5 ** 1),
+                      int(self.in_channel * 1.5 ** 2),
                       kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(int(n_channel * 1.5 ** 2)),
-            nn.Conv1d(int(n_channel * 1.5 ** 2),
-                      int(n_channel * 1.5 ** 3),
+            nn.CELU(),
+            nn.Conv1d(int(self.in_channel * 1.5 ** 2),
+                      int(self.in_channel * 1.5 ** 3),
                       kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(int(n_channel * 1.5 ** 3)),
-            nn.Conv1d(int(n_channel * 1.5 ** 3),
-                      int(n_channel * 1.5 ** 4),
+            nn.CELU(),
+            nn.Conv1d(int(self.in_channel * 1.5 ** 3),
+                      int(self.in_channel * 1.5 ** 4),
                       kernel_size=7, stride=3, padding=2),
-            nn.BatchNorm1d(int(n_channel * 1.5 ** 4)),
-            nn.Conv1d(int(n_channel * 1.5 ** 4),
-                      int(n_channel * 1.5 ** 5),
+            nn.CELU(),
+            nn.Conv1d(int(self.in_channel * 1.5 ** 4),
+                      int(self.in_channel * 1.5 ** 5),
                       kernel_size=11, stride=5, padding=5),
-            nn.BatchNorm1d(n_channel + int(5 * n_channel / n_layer)),
+            nn.BatchNorm1d(self.in_channel + int(5 * self.in_channel / n_layer)),
 
         )
 
-        self.n_channel = n_channel
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_enc(x)
 
     def _get_str(self):
-        return f"Encoder2Bis_{self.n_channel}"
+        return f"Encoder2Bis_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return int(self.n_channel * 1.5 ** 5)
+        return int(self.in_channel * 1.5 ** 5)
 
     def division_factor(self) -> int:
         return 2 * 2 * 3 * 5
@@ -673,47 +609,40 @@ class Encoder2Bis(Coder):
 
 class Decoder2Bis(Coder):
     def __init__(self, n_fft: int):
-        super().__init__(n_fft)
+        super().__init__(n_fft, int(n_fft * 2 * 1.5 ** 5))
 
         n_channel = n_fft * 2
-        n_layer = 5
 
         self.cnn_tr_dec = nn.Sequential(
             nn.ConvTranspose1d(int(n_channel * 1.5 ** 5),
                                int(n_channel * 1.5 ** 4),
                                kernel_size=11, stride=5, padding=3),
-            nn.BatchNorm1d(int(n_channel * 1.5 ** 4)),
+            nn.CELU(),
             nn.ConvTranspose1d(int(n_channel * 1.5 ** 4),
                                int(n_channel * 1.5 ** 3),
                                kernel_size=7, stride=3, padding=2),
-            nn.BatchNorm1d(int(n_channel * 1.5 ** 3)),
+            nn.CELU(),
             nn.ConvTranspose1d(int(n_channel * 1.5 ** 3),
                                int(n_channel * 1.5 ** 2),
                                kernel_size=5, stride=2, padding=2, output_padding=1),
-            nn.BatchNorm1d(int(n_channel * 1.5 ** 2)),
+            nn.CELU(),
             nn.ConvTranspose1d(int(n_channel * 1.5 ** 2),
                                int(n_channel * 1.5 ** 1),
                                kernel_size=5, stride=2, padding=2, output_padding=1),
-            nn.BatchNorm1d(int(n_channel * 1.5 ** 1)),
+            nn.CELU(),
             nn.ConvTranspose1d(int(n_channel * 1.5 ** 1),
                                n_channel,
                                kernel_size=3, padding=1)
         )
 
-        self.n_channel = int(n_channel * 1.5 ** 5)
-
-    def forward(self, x):
-        assert len(x.size()) == 3, \
-            f"Wrong input size length, actual : {len(x.size())}, needed : {3}."
-        assert x.size(1) == self.n_channel, \
-            f"Wrong channel number, actual : {x.size(1)}, needed : {self.n_channel}."
+    def _coder_forward(self, x: th.Tensor) -> th.Tensor:
         return self.cnn_tr_dec(x)
 
     def _get_str(self):
-        return f"Decoder2Bis_{self.n_channel}"
+        return f"Decoder2Bis_{self.in_channel}"
 
     def hidden_channels(self) -> int:
-        return self.n_channel
+        return self.in_channel
 
     def division_factor(self) -> int:
         return 2 * 2 * 3 * 5
