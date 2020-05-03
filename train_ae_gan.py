@@ -72,7 +72,7 @@ def main() -> None:
     enc.cuda(0)
     dec.cuda(0)
 
-    disc = networks.DiscriminatorCNN(n_fft)
+    disc = networks.DumbDiscriminatorCNN(n_fft)
     disc.cuda(0)
 
     assert data.size(2) // dec.division_factor() == hidden_length, \
@@ -84,7 +84,7 @@ def main() -> None:
     ae_loss_fn.cuda(0)
 
     optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=lr_auto_encoder)
-    optim_disc = th.optim.Adam(disc.parameters(), lr=lr_discriminator)
+    optim_disc = th.optim.SGD(disc.parameters(), lr=lr_discriminator)
     optim_gen = th.optim.Adam(dec.parameters(), lr=lr_generator)
 
     if args.mode and args.mode == "overfit":
@@ -197,8 +197,8 @@ def main() -> None:
                                       f"ae_avg = {sum_loss_ae / nb_backward_ae:.6f}, "
                                       f"disc_avg = {sum_loss_disc / nb_backward_disc:.6f}, "
                                       f"gen_avg = {sum_loss_gen / nb_backward_gen:.6f}, "
-                                      f"acc_real = {nb_correct_real / nb_pass_disc:.6f}, "
-                                      f"acc_fake = {nb_correct_fake / nb_pass_disc:.6f}")
+                                      f"prec_real = {nb_correct_real / nb_pass_disc:.6f}, "
+                                      f"prec_fake = {nb_correct_fake / nb_pass_disc:.6f}")
 
         th.save(enc.cpu().state_dict(), join(out_dir, f"{enc}_epoch-{e}.th"))
         th.save(dec.cpu().state_dict(), join(out_dir, f"{dec}_epoch-{e}.th"))

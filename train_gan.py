@@ -53,13 +53,13 @@ def main() -> None:
     if args.from_decoder is not None:
         gen.load_state_dict(th.load(args.from_decoder))
 
-    disc = networks.DiscriminatorCNN(n_fft)
+    disc = networks.DumbDiscriminatorCNN(n_fft)
 
     gen = gen.to(th.device("cuda"))
     disc = disc.to(th.device("cuda"))
 
-    optim_gen = th.optim.Adam(gen.parameters(), lr=lr_gen)
-    optim_disc = th.optim.Adam(disc.parameters(), lr=lr_discriminator)
+    optim_gen = th.optim.SGD(gen.parameters(), lr=lr_gen)
+    optim_disc = th.optim.SGD(disc.parameters(), lr=lr_discriminator)
 
     hidden_size = seconds * sample_rate // n_fft // gen.division_factor()
 
@@ -81,6 +81,9 @@ def main() -> None:
 
         sum_loss_gen = 0
         nb_backward_gen = 0
+
+        nb_correct_real, nb_correct_fake = 0, 0
+        nb_pass_disc = 0
 
         b_idxs = list(range(nb_batch))
         random.shuffle(b_idxs)
@@ -104,6 +107,10 @@ def main() -> None:
 
             out_real = disc(x_real)
             out_fake = disc(x_fake)
+
+            nb_correct_real += (out_real > 0.5).sum().item()
+            nb_correct_fake += (out_fake <= 0.5).sum().item()
+            nb_pass_disc += out_real.size(0)
 
             optim_disc.zero_grad()
             loss = networks.discriminator_loss(out_real, out_fake)
@@ -131,7 +138,9 @@ def main() -> None:
 
             tqdm_bar.set_description(f"Epoch {e:2d} : "
                                      f"disc_avg = {sum_loss_disc / nb_backward_disc:.6f}, "
-                                     f"gen_avg = {sum_loss_gen / nb_backward_gen:.6f} ")
+                                     f"gen_avg = {sum_loss_gen / nb_backward_gen:.6f}, "
+                                     f"prec_real = {nb_correct_real / nb_pass_disc:.6f}, "
+                                     f"prec_fake = {nb_correct_fake / nb_pass_disc:.6f}")
 
             if th.isnan(loss).any():
                 print("NaN detected - Exiting :,(")
