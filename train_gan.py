@@ -3,7 +3,9 @@ import sys
 from os import mkdir
 from os.path import join, exists, isdir
 
+import pickle as pkl
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 import torch as th
 
@@ -66,11 +68,16 @@ def main() -> None:
     assert data.size(2) // gen.division_factor() == hidden_size, \
         f"Wrong hidden size, data : {data.size(2) // gen.division_factor()}, expected : {hidden_size}"
 
-    nb_epoch = 100
+    nb_epoch = 20
     batch_size = 4
     nb_batch = data.size(0) // batch_size
 
     print("Train discriminator")
+
+    losses_disc = []
+    losses_gen = []
+    acc_real = []
+    acc_fake = []
 
     # Train Disc
     for e in range(nb_epoch):
@@ -113,11 +120,11 @@ def main() -> None:
             nb_pass_disc += out_real.size(0)
 
             optim_disc.zero_grad()
-            loss = networks.discriminator_loss(out_real, out_fake)
-            loss.backward()
+            loss_disc = networks.discriminator_loss(out_real, out_fake)
+            loss_disc.backward()
             optim_disc.step()
 
-            sum_loss_disc += loss.item()
+            sum_loss_disc += loss_disc.item()
             nb_backward_disc += 1
 
             # Generator
@@ -129,11 +136,11 @@ def main() -> None:
             out_fake = disc(x_fake)
 
             optim_gen.zero_grad()
-            loss = networks.generator_loss(out_fake)
-            loss.backward()
+            loss_gen = networks.generator_loss(out_fake)
+            loss_gen.backward()
             optim_gen.step()
 
-            sum_loss_gen += loss.item()
+            sum_loss_gen += loss_gen.item()
             nb_backward_gen += 1
 
             tqdm_bar.set_description(f"Epoch {e:2d} : "
@@ -142,9 +149,14 @@ def main() -> None:
                                      f"prec_real = {nb_correct_real / nb_pass_disc:.6f}, "
                                      f"prec_fake = {nb_correct_fake / nb_pass_disc:.6f}")
 
-            if th.isnan(loss).any():
+            if th.isnan(loss_gen).any():
                 print("NaN detected - Exiting :,(")
                 exit()
+
+        losses_disc.append(sum_loss_disc / nb_backward_disc)
+        losses_gen.append(sum_loss_gen / nb_backward_gen)
+        acc_fake.append(nb_correct_fake / nb_pass_disc)
+        acc_real.append(nb_correct_real / nb_pass_disc)
 
         th.save(gen.cpu().state_dict(), join(out_dir, f"{gen}_epoch-{e}.th"))
         th.save(optim_gen.state_dict(), join(out_dir, f"optim_gen_epoch-{e}.th"))
@@ -153,6 +165,16 @@ def main() -> None:
 
         gen = gen.to(th.device("cuda"))
         disc = disc.to(th.device("cuda"))
+
+    ticks = range(nb_epoch)
+    plt.plot(ticks, losses_disc, color="red", label="Disc. loss")
+    plt.plot(ticks, losses_gen, color="blue", label="Gen. loss")
+    plt.plot(ticks, acc_fake, color="green", label="Fake precision")
+    plt.plot(ticks, acc_real, color="turquoise", label="Real precision")
+    plt.title(f"Train GAN - Decoder {archi}")
+    plt.xlabel("epoch")
+    plt.legend()
+    plt.savefig(join(out_dir, f"train_gan_archi{archi}_{nb_epoch}epoch.png"))
 
 
 if __name__ == '__main__':
