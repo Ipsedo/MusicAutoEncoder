@@ -837,22 +837,22 @@ class DumbDiscriminatorCNN(nn.Module):
         return f"DiscriminatorCNN_{self.n_channel}"
 
 
-def discriminator_loss(d_z_prime, d_z):
-    assert len(d_z_prime.size()) == 1, \
-        f"Wrong z_prime size, actual : {d_z_prime.size()}, needed : (N)."
-    assert len(d_z.size()) == 1, \
-        f"Wrong z size, actual : {d_z.size()}, needed : (N)."
-    assert d_z_prime.size(0) == d_z.size(0), \
-        f"z_prime en z must have the same batch size, z_fake : {d_z_prime.size(0)} and z_real : {d_z.size(0)}"
+def discriminator_loss(y_real: th.Tensor, y_fake: th.Tensor) -> th.Tensor:
+    assert len(y_real.size()) == 1, \
+        f"Wrong y_real size, actual : {y_real.size()}, needed : (N)."
+    assert len(y_fake.size()) == 1, \
+        f"Wrong y_fake size, actual : {y_fake.size()}, needed : (N)."
+    assert y_real.size(0) == y_fake.size(0), \
+        f"y_real and y_fake must have the same batch size, y_real : {y_real.size(0)} and y_fake : {y_fake.size(0)}"
 
-    return -th.mean(th.log2(d_z_prime) + th.log2(1. - d_z), dim=0)
+    return -th.mean(th.log2(y_real) + th.log2(1. - y_fake), dim=0)
 
 
-def generator_loss(d_z):
-    assert len(d_z.size()) == 1, \
-        f"Wrong z size, actual : {d_z.size()}, needed : (N)."
+def generator_loss(y_fake: th.Tensor) -> th.Tensor:
+    assert len(y_fake.size()) == 1, \
+        f"Wrong y_fake size, actual : {y_fake.size()}, needed : (N)."
 
-    return -th.mean(th.log2(d_z), dim=0)
+    return -th.mean(th.log2(y_fake), dim=0)
 
 
 def generator_loss_2(d_z):
