@@ -68,8 +68,8 @@ def main() -> None:
         #random_data = word_embedding.gen_embedding("/home/samuel/Documents/fastText/cc.fr.300.bin",
         #                                           s, hidden_length, hidden_channel)
 
-        print(random_data.mean(dim=1))
-        print(random_data.std(dim=1))
+        #print(random_data.mean(dim=1))
+        #print(random_data.std(dim=1))
         print("Passing random data to decoder")
         out = dec(random_data)
 
