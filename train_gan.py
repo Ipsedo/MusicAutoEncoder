@@ -1,9 +1,7 @@
 import argparse
-import sys
 from os import mkdir
 from os.path import join, exists, isdir
 
-import pickle as pkl
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
