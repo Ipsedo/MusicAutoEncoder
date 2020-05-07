@@ -837,6 +837,55 @@ class DumbDiscriminatorCNN(nn.Module):
         return f"DiscriminatorCNN_{self.n_channel}"
 
 
+####################################################
+# Discriminator Hidden CNN
+# designed for nFFT = 49 and sampling_rate = 44100
+####################################################
+
+class DiscriminatorHiddenCNN(nn.Module):
+    def __init__(self, hidden_channels: int):
+        super().__init__()
+
+        self.n_channel = hidden_channels
+
+        self.cnn = nn.Sequential(
+            nn.Conv1d(self.n_channel,
+                      int(self.n_channel * 0.6),
+                      kernel_size=3, padding=1),
+            nn.CELU(),
+            nn.Conv1d(int(self.n_channel * 0.6),
+                      int(self.n_channel * 0.6 ** 2),
+                      kernel_size=5, stride=2, padding=2),
+            nn.CELU(),
+            nn.Conv1d(int(self.n_channel * 0.6 ** 2),
+                      int(self.n_channel * 0.6 ** 3),
+                      kernel_size=7, stride=5, padding=3),
+            nn.CELU()
+        )
+
+        self.classif = nn.Sequential(
+            nn.Linear(int(self.n_channel * 0.6 ** 3) * 25, 4096),
+            nn.CELU(),
+            nn.Linear(4096, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        out = self.cnn(x)
+        out = out.flatten(1, 2)
+        out = self.classif(out)
+        return out.view(-1)
+
+    def __str__(self):
+        return self.__get_str()
+
+    def __repr__(self):
+        return self.__get_str()
+
+    def __get_str(self):
+        return f"DiscriminatorCNN_{self.n_channel}"
+
+
 def discriminator_loss(y_real: th.Tensor, y_fake: th.Tensor) -> th.Tensor:
     assert len(y_real.size()) == 1, \
         f"Wrong y_real size, actual : {y_real.size()}, needed : (N)."
