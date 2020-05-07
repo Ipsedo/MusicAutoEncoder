@@ -23,9 +23,9 @@ def main() -> None:
     parser.add_argument("--sample-rate", type=int, default=44100, dest="sample_rate")
     parser.add_argument("--seconds", type=int, required=True, dest="seconds")
     parser.add_argument("--tensor-file", type=str, required=True, dest="tensor_file")
-    parser.add_argument("--lr-ae", type=float, default=6e-5, dest="lr_auto_encoder")
-    parser.add_argument("--lr-disc", type=float, default=8e-5, dest="lr_discriminator")
-    parser.add_argument("--lr-gen", type=float, default=8e-5, dest="lr_generator")
+    parser.add_argument("--lr-ae", type=float, default=1e-5, dest="lr_auto_encoder")
+    parser.add_argument("--lr-disc", type=float, default=3e-5, dest="lr_discriminator")
+    parser.add_argument("--lr-gen", type=float, default=3e-5, dest="lr_generator")
     parser.add_argument("--out-model-dir", type=str, required=True, dest="out_dir")
 
     args = parser.parse_args()
@@ -62,12 +62,12 @@ def main() -> None:
     ae_loss_fn = nn.MSELoss()
     ae_loss_fn.cuda(0)
 
-    disc = networks.DiscriminatorHiddenCNN(enc.hidden_channels())
+    disc = networks.DiscriminatorHidden4bisCNN(enc.hidden_channels())
     disc.cuda(0)
 
     optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=lr_auto_encoder)
-    optim_gen = th.optim.Adam(enc.parameters(), lr=lr_generator)
-    optim_disc = th.optim.Adam(disc.parameters(), lr=lr_discriminator)
+    optim_gen = th.optim.SGD(enc.parameters(), lr=lr_generator)
+    optim_disc = th.optim.SGD(disc.parameters(), lr=lr_discriminator)
 
     nb_epoch = 40
 
