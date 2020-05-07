@@ -840,9 +840,11 @@ class DumbDiscriminatorCNN(nn.Module):
 ####################################################
 # Discriminator Hidden CNN
 # designed for nFFT = 49 and sampling_rate = 44100
+# and time split = 10 secondes,
+# division factor equal to archi 4bis
 ####################################################
 
-class DiscriminatorHiddenCNN(nn.Module):
+class DiscriminatorHidden4bisCNN(nn.Module):
     def __init__(self, hidden_channels: int):
         super().__init__()
 
@@ -875,6 +877,9 @@ class DiscriminatorHiddenCNN(nn.Module):
         out = out.flatten(1, 2)
         out = self.classif(out)
         return out.view(-1)
+
+    def input_size(self) -> int:
+        return 10 * 44100 // 49 // (2 * 2 * 3 * 3)
 
     def __str__(self):
         return self.__get_str()
