@@ -62,13 +62,14 @@ def main() -> None:
     ae_loss_fn = nn.MSELoss()
     ae_loss_fn.cuda(0)
 
-    disc = networks.Discriminator(enc.hidden_channels())
+    disc = networks.DiscriminatorHiddenCNN(enc.hidden_channels())
+    disc.cuda(0)
 
-    optim_ae = th.optim.SGD(list(enc.parameters()) + list(dec.parameters()), lr=lr_auto_encoder)
-    optim_gen = th.optim.SGD(enc.parameters(), lr=lr_generator)
-    optim_disc = th.optim.SGD(disc.parameters(), lr=lr_discriminator)
+    optim_ae = th.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=lr_auto_encoder)
+    optim_gen = th.optim.Adam(enc.parameters(), lr=lr_generator)
+    optim_disc = th.optim.Adam(disc.parameters(), lr=lr_discriminator)
 
-    nb_epoch = 10
+    nb_epoch = 40
 
     batch_size = 4
     nb_batch = ceil(data.size(0) / batch_size)
@@ -97,13 +98,80 @@ def main() -> None:
             i_max = (b_idx + 1) * batch_size
             i_max = i_max if i_max < data.size(0) else data.size(0)
 
-            x_batch = data[i_min:i_max]
+            hidden_size = seconds * sample_rate // n_fft // enc.division_factor()
+            hidden_channels = enc.hidden_channels()
+
+            x_batch = data[i_min:i_max].cuda(0)
 
             # Auto Encoder
+            nb_sec_ae = 1
+            x_splitted = th.stack(x_batch.split(nb_sec_ae * sample_rate // n_fft), dim=0).flatten(0, 1)
+            enc.train()
+            dec.train()
+
+            ae_batch_size = 4
+            nb_batch_ae = ceil(x_splitted.size(0) / ae_batch_size)
+
+            for b_ae_idx in range(nb_batch_ae):
+                i_min_ae = b_ae_idx * ae_batch_size
+                i_max_ae = (b_ae_idx + 1) * ae_batch_size
+                i_max_ae = i_max_ae if i_max_ae < x_splitted.size(0) else x_splitted.size(0)
+
+                x = x_splitted[i_min_ae:i_max_ae]
+
+                hidden_repr = enc(x)
+                out_ae = dec(hidden_repr)
+
+                loss_ae = ae_loss_fn(out_ae, x)
+
+                optim_ae.zero_grad()
+                loss_ae.backward()
+                optim_ae.step()
+
+                sum_loss_ae += loss_ae.item()
+
+                nb_backward_ae += 1
 
             # Discriminator
+            enc.eval()
+            disc.train()
+
+            z_real = th.randn(i_max - i_min, hidden_channels, hidden_size, device=th.device("cuda:0"), dtype=th.float)
+            z_fake = enc(x_batch)
+
+            out_real = disc(z_real)
+            out_fake = disc(z_fake)
+
+            loss_disc = networks.discriminator_loss(out_real, out_fake)
+
+            optim_disc.zero_grad()
+            loss_disc.backward()
+            optim_disc.step()
+
+            sum_loss_disc += loss_disc.item()
+
+            nb_correct_real += (out_real > 0.5).sum().item()
+            nb_correct_fake += (out_fake < 0.5).sum().item()
+
+            nb_backward_disc += 1
+            nb_pass_disc += out_real.size(0)
 
             # Generator
+            enc.train()
+            disc.eval()
+
+            z_fake = enc(x_batch)
+            out_fake = disc(z_fake)
+
+            loss_gen = networks.generator_loss(out_fake)
+
+            optim_gen.zero_grad()
+            loss_gen.backward()
+            optim_gen.step()
+
+            sum_loss_gen += loss_gen.item()
+
+            nb_backward_gen += 1
 
             tqdm_bar.set_description(f"Epoch {e:2d} : "
                                       f"ae_avg = {sum_loss_ae / nb_backward_ae:.6f}, "
