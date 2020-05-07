@@ -732,6 +732,7 @@ class Discriminator(nn.Module):
 ####################################################
 # Discriminator CNN
 # designed for nFFT = 49 and sampling_rate = 44100
+# and time split = 1 second
 ####################################################
 
 class DiscriminatorCNN(nn.Module):
@@ -789,6 +790,7 @@ class DiscriminatorCNN(nn.Module):
 ####################################################
 # DumbDiscriminator CNN
 # designed for nFFT = 49 and sampling_rate = 44100
+# and time split = 1 second
 ####################################################
 
 class DumbDiscriminatorCNN(nn.Module):
@@ -840,7 +842,7 @@ class DumbDiscriminatorCNN(nn.Module):
 ####################################################
 # Discriminator Hidden CNN
 # designed for nFFT = 49 and sampling_rate = 44100
-# and time split = 10 secondes,
+# and time split = 10 seconds,
 # division factor equal to archi 4bis
 ####################################################
 
